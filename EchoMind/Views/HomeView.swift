@@ -1,0 +1,284 @@
+//
+//  HomeView.swift
+//  EchoMind
+//
+//  Created by Oleksandr Stepanov on 26.02.26.
+//
+
+import SwiftUI
+import Foundation
+import AVFoundation
+
+struct HomeView: View {
+    @State private var showingRecording = false
+    @State private var recent: [RecordingFile] = []
+    @State private var lastSavedURL: URL?
+    @State private var showSavedBanner = false
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 18) {
+                    header
+
+                    recordCard
+
+                    recentSection
+
+                    Spacer(minLength: 10)
+                }
+                .padding(.horizontal)
+                .padding(.top, 12)
+            }
+            .task { reloadRecent() }
+            .sheet(isPresented: $showingRecording) {
+                RecordingView { url in
+                    lastSavedURL = url
+                    reloadRecent()
+                    showSavedBanner = true
+                }
+            }
+            .overlay(alignment: .top) {
+                if showSavedBanner {
+                    SavedBannerView(title: "Saved", subtitle: lastSavedURL?.lastPathComponent)
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.6) {
+                                withAnimation { showSavedBanner = false }
+                            }
+                        }
+                }
+            }
+        }
+    }
+}
+
+#Preview {
+    HomeView()
+}
+
+// MARK: - UI
+
+private extension HomeView {
+    var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("EchoMind")
+                .font(.largeTitle.weight(.semibold))
+            Text("Record a thought. Get a clean note.")
+                .font(.headline)
+                .foregroundStyle(.primary)
+            Text("Tap the mic to start.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    var recordCard: some View {
+        VStack(spacing: 14) {
+            Button {
+                showingRecording = true
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 116, height: 116)
+
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 44, weight: .semibold))
+                }
+                .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Start recording")
+
+            VStack(spacing: 4) {
+                Text("Tap to record")
+                    .font(.headline)
+
+                Text("Speak naturally — we’ll handle the rest")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 10) {
+                QuickActionChip(title: "Ideas", systemImage: "lightbulb")
+                QuickActionChip(title: "Study", systemImage: "graduationcap")
+                QuickActionChip(title: "Tasks", systemImage: "checklist")
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.thinMaterial)
+        )
+    }
+
+    var recentSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Recent recordings")
+                .font(.headline)
+
+            if recent.isEmpty {
+                ContentUnavailableView(
+                    "No recordings yet",
+                    systemImage: "waveform",
+                    description: Text("Your newest recordings will show up here.")
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+            } else {
+                VStack(spacing: 10) {
+                    ForEach(recent) { item in
+                        RecentRecordingRow(item: item)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 2)
+    }
+}
+
+// MARK: - Components
+
+private struct QuickActionChip: View {
+    let title: String
+    let systemImage: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.caption)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+            .foregroundStyle(.secondary)
+            .accessibilityHidden(true)
+    }
+}
+
+private struct RecentRecordingRow: View {
+    let item: RecordingFile
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "waveform")
+                .frame(width: 26)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.displayTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+
+                HStack(spacing: 8) {
+                    Text(item.fileName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                    Text("•")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(item.durationFormatted)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            ShareLink(item: item.url) {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Export")
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.thinMaterial)
+        )
+    }
+}
+
+private struct SavedBannerView: View {
+    let title: String
+    let subtitle: String?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.subheadline.weight(.semibold))
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 6)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            Capsule(style: .continuous)
+                .fill(.ultraThinMaterial)
+        )
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Recent loader
+
+private extension HomeView {
+    func reloadRecent() {
+        recent = RecentRecordingLoader.load(limit: 3)
+    }
+}
+
+private enum RecentRecordingLoader {
+    static func load(limit: Int) -> [RecordingFile] {
+        guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return []
+        }
+
+        let urls: [URL]
+        do {
+            urls = try FileManager.default.contentsOfDirectory(
+                at: dir,
+                includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey],
+                options: [.skipsHiddenFiles]
+            )
+        } catch {
+            return []
+        }
+
+        let m4a = urls.filter { $0.pathExtension.lowercased() == "m4a" }
+
+        let items: [RecordingFile] = m4a.compactMap { url in
+            let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey])
+            let created = values?.creationDate ?? values?.contentModificationDate ?? Date.distantPast
+
+            // Duration from the audio file (avoids deprecated AVAsset.duration access on iOS 16+).
+            let safeDuration: TimeInterval = (try? AVAudioPlayer(contentsOf: url).duration) ?? 0
+
+            return RecordingFile(
+                id: url.lastPathComponent,
+                url: url,
+                createdAt: created,
+                duration: safeDuration
+            )
+        }
+
+        return items
+            .sorted { $0.createdAt > $1.createdAt }
+            .prefix(max(0, limit))
+            .map { $0 }
+    }
+}
