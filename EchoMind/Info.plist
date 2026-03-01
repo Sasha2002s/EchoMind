@@ -4,8 +4,7 @@
 <dict>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
-		<string>com.sashastepanov.EchoMind.transcription.processing
-</string>
+		<string>com.sashastepanov.EchoMind.transcription.processing</string>
 	</array>
 	<key>UIBackgroundModes</key>
 	<array>

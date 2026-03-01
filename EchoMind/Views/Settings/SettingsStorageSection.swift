@@ -9,6 +9,8 @@ import SwiftUI
 
 struct SettingsStorageSection: View {
     @Binding var keepAudio: KeepAudioPolicy
+    @Binding var defaultExportFormat: ExportFormatPreference
+    @Binding var shareStyle: ShareStylePreference
 
     var body: some View {
         Section("Storage") {
@@ -20,6 +22,28 @@ struct SettingsStorageSection: View {
             ) {
                 ForEach(KeepAudioPolicy.allCases) { policy in
                     Text(policy.displayName).tag(policy)
+                }
+            }
+
+            PickerRow(
+                title: "Default Export Format",
+                subtitle: defaultExportFormat.displayName,
+                systemImage: "square.and.arrow.down",
+                selection: $defaultExportFormat
+            ) {
+                ForEach(ExportFormatPreference.allCases) { format in
+                    Text(format.displayName).tag(format)
+                }
+            }
+
+            PickerRow(
+                title: "Share Style",
+                subtitle: shareStyle.displayName,
+                systemImage: "square.and.arrow.up",
+                selection: $shareStyle
+            ) {
+                ForEach(ShareStylePreference.allCases) { style in
+                    Text(style.displayName).tag(style)
                 }
             }
 

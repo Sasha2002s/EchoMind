@@ -1,0 +1,21 @@
+//
+//  ActivityView.swift
+//  EchoMind
+//
+//  Created by Codex on 01.03.26.
+//
+
+import SwiftUI
+import UIKit
+
+struct ActivityView: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // No-op: items are set during presentation.
+    }
+}

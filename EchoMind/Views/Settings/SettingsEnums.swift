@@ -88,3 +88,39 @@ enum KeepAudioPolicy: String, CaseIterable, Identifiable {
         }
     }
 }
+
+enum ExportFormatPreference: String, CaseIterable, Identifiable {
+    case m4a
+    case wav
+    case txt
+    case md
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .m4a: return "M4A"
+        case .wav: return "WAV"
+        case .txt: return "TXT"
+        case .md: return "Markdown"
+        }
+    }
+
+    var fileExtension: String { rawValue }
+}
+
+enum ShareStylePreference: String, CaseIterable, Identifiable {
+    case audioOnly
+    case textOnly
+    case audioAndText
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .audioOnly: return "Audio only"
+        case .textOnly: return "Text only"
+        case .audioAndText: return "Audio + Text"
+        }
+    }
+}

@@ -13,9 +13,13 @@ import Foundation
 
 struct RecordingView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("settings.shareStyle") private var shareStyle: ShareStylePreference = .audioOnly
 
     let onFinished: (URL) -> Void
     @StateObject private var vm = AudioRecorderViewModel()
+    @State private var shareItems: [Any] = []
+    @State private var isShareSheetPresented = false
+    private let shareService = RecordingShareService()
 
     init(onFinished: @escaping (URL) -> Void = { _ in }) {
         self.onFinished = onFinished
@@ -100,7 +104,9 @@ struct RecordingView: View {
             .padding(.bottom, 10)
 
             if let url = vm.recordedURL, !vm.hasActiveSession {
-                ShareLink(item: url) {
+                Button {
+                    prepareShare(for: url)
+                } label: {
                     Label("Export recording", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
                 }
@@ -121,6 +127,23 @@ struct RecordingView: View {
         } message: {
             Text("Please enable microphone access in Settings to record audio.")
         }
+        .sheet(isPresented: $isShareSheetPresented, onDismiss: {
+            shareItems = []
+        }) {
+            ActivityView(items: shareItems)
+        }
+    }
+
+    private func prepareShare(for audioURL: URL) {
+        let items = shareService.makeShareItems(
+            audioURL: audioURL,
+            recordingTitle: "Recording",
+            style: shareStyle
+        )
+        guard !items.isEmpty else { return }
+        shareItems = items
+        isShareSheetPresented = true
+        HapticsService.selectionChanged()
     }
 }
 

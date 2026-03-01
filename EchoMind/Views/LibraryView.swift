@@ -13,6 +13,10 @@ struct LibraryView: View {
     let voiceMemoImportService: any VoiceMemoImporting
     @ObservedObject var player: LibraryAudioPlayer
     private let fileService = RecordingDetailFileService()
+    private let exportService = RecordingExportService()
+    private let shareService = RecordingShareService()
+    @AppStorage("settings.defaultExportFormat") private var defaultExportFormat: ExportFormatPreference = .m4a
+    @AppStorage("settings.shareStyle") private var shareStyle: ShareStylePreference = .audioOnly
 
     @State private var recordings: [RecordingFile] = []
     @State private var isLoading = false
@@ -21,9 +25,11 @@ struct LibraryView: View {
     @State private var pendingDeleteItem: RecordingFile?
     @State private var pendingRenameItem: RecordingFile?
     @State private var renameInput: String = ""
-    @State private var exportDocument: ExportAudioDocument?
+    @State private var exportDocument: ExportDocument?
     @State private var exportDefaultName: String = "Recording"
     @State private var isExporting = false
+    @State private var shareItems: [Any] = []
+    @State private var isShareSheetPresented = false
 
     var body: some View {
         NavigationStack {
@@ -46,12 +52,14 @@ struct LibraryView: View {
                                 RecordingRow(item: item)
                             }
                             .contextMenu {
-                                ShareLink(item: item.url) {
+                                Button {
+                                    prepareShare(for: item)
+                                } label: {
                                     Label("Share", systemImage: "square.and.arrow.up")
                                 }
 
                                 Button {
-                                    prepareExport(for: item)
+                                    Task { await prepareExport(for: item) }
                                 } label: {
                                     Label("Export", systemImage: "square.and.arrow.down")
                                 }
@@ -120,6 +128,11 @@ struct LibraryView: View {
                     )
                 }
                 exportDocument = nil
+            }
+            .sheet(isPresented: $isShareSheetPresented, onDismiss: {
+                shareItems = []
+            }) {
+                ActivityView(items: shareItems)
             }
             .confirmationDialog(
                 "Delete this recording?",
@@ -229,11 +242,16 @@ struct LibraryView: View {
     }
 
     @MainActor
-    private func prepareExport(for item: RecordingFile) {
+    private func prepareExport(for item: RecordingFile) async {
         do {
             // Why: export should hand out a stable data snapshot from app sandbox to Files/share targets.
-            exportDocument = try ExportAudioDocument(audioURL: item.url)
-            exportDefaultName = item.fileName
+            let payload = try await exportService.prepareExport(
+                audioURL: item.url,
+                defaultName: item.fileName,
+                format: defaultExportFormat
+            )
+            exportDocument = ExportDocument(data: payload.data, contentType: payload.contentType)
+            exportDefaultName = payload.defaultFilename
             isExporting = true
             HapticsService.selectionChanged()
         } catch {
@@ -243,6 +261,19 @@ struct LibraryView: View {
                 body: error.localizedDescription
             )
         }
+    }
+
+    @MainActor
+    private func prepareShare(for item: RecordingFile) {
+        let items = shareService.makeShareItems(
+            audioURL: item.url,
+            recordingTitle: item.displayTitle,
+            style: shareStyle
+        )
+        guard !items.isEmpty else { return }
+        shareItems = items
+        isShareSheetPresented = true
+        HapticsService.selectionChanged()
     }
 
     @MainActor
@@ -337,11 +368,24 @@ private struct UserMessage: Identifiable {
     let body: String
 }
 
-private struct ExportAudioDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.audio] }
+private struct ExportDocument: FileDocument {
+    static var readableContentTypes: [UTType] {
+        [
+            .audio,
+            .plainText,
+            .wav,
+            UTType(filenameExtension: "m4a") ?? .audio,
+            UTType(filenameExtension: "md") ?? .plainText
+        ]
+    }
 
     let data: Data
     let contentType: UTType
+
+    init(data: Data, contentType: UTType) {
+        self.data = data
+        self.contentType = contentType
+    }
 
     init(audioURL: URL) throws {
         data = try Data(contentsOf: audioURL)

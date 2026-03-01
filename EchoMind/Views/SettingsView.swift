@@ -19,8 +19,12 @@ struct SettingsView: View {
     @AppStorage("settings.taskDetection") private var taskDetectionEnabled: Bool = true
 
     @AppStorage("settings.keepAudio") private var keepAudio: KeepAudioPolicy = .always
+    @AppStorage("settings.defaultExportFormat") private var defaultExportFormat: ExportFormatPreference = .m4a
+    @AppStorage("settings.shareStyle") private var shareStyle: ShareStylePreference = .audioOnly
     @AppStorage("settings.preventAutoLock") private var preventAutoLock: Bool = true
     @AppStorage("settings.whisperModel") private var whisperModel: WhisperModelChoice = .none
+    @AppStorage(WhisperBackgroundDownloadManager.wifiOnlySettingKey) private var whisperDownloadWiFiOnly = true
+    @AppStorage(WhisperBackgroundDownloadManager.pauseOnLowPowerSettingKey) private var whisperPauseOnLowPower = true
 
     @StateObject private var vm: SettingsViewModel
 
@@ -50,9 +54,18 @@ struct SettingsView: View {
                     taskDetectionEnabled: $taskDetectionEnabled
                 )
 
-                SettingsWhisperSection(whisperModel: $whisperModel, vm: vm)
+                SettingsWhisperSection(
+                    whisperModel: $whisperModel,
+                    downloadOnWiFiOnly: $whisperDownloadWiFiOnly,
+                    pauseOnLowPowerMode: $whisperPauseOnLowPower,
+                    vm: vm
+                )
 
-                SettingsStorageSection(keepAudio: $keepAudio)
+                SettingsStorageSection(
+                    keepAudio: $keepAudio,
+                    defaultExportFormat: $defaultExportFormat,
+                    shareStyle: $shareStyle
+                )
 
                 SettingsSupportSection()
                 SettingsChangelogSection()

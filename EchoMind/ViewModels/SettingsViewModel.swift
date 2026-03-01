@@ -16,6 +16,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var whisperIsDownloading: Bool = false
     @Published var whisperDownloadProgress: Double? = nil
     @Published var whisperDownloadError: String? = nil
+    @Published var whisperPausedReason: String? = nil
     @Published var whisperModelInstalledOnDisk: Bool = false
 
     private let whisperModelManager: WhisperModelManager
@@ -86,6 +87,12 @@ final class SettingsViewModel: ObservableObject {
         whisperIsDownloading = false
         whisperDownloadProgress = nil
         whisperDownloadError = nil
+        whisperPausedReason = nil
+    }
+
+    func resumeWhisperDownload(for model: WhisperModelChoice) {
+        currentWhisperModelSelection = model
+        whisperBackgroundDownloadManager.startDownload(for: model)
     }
 
     func deleteWhisperModel(for model: WhisperModelChoice) {
@@ -120,26 +127,37 @@ final class SettingsViewModel: ObservableObject {
         case .idle:
             whisperIsDownloading = false
             whisperDownloadProgress = nil
+            whisperPausedReason = nil
 
         case .preparing:
             whisperIsDownloading = true
             whisperDownloadProgress = nil
             whisperDownloadError = nil
+            whisperPausedReason = nil
 
         case .downloading:
             whisperIsDownloading = true
             whisperDownloadProgress = progress
             whisperDownloadError = nil
+            whisperPausedReason = nil
+
+        case .pausedLowPower:
+            whisperIsDownloading = false
+            whisperDownloadProgress = progress
+            whisperDownloadError = nil
+            whisperPausedReason = "Paused because Low Power Mode is on."
 
         case .installing:
             whisperIsDownloading = true
             whisperDownloadProgress = nil
             whisperDownloadError = nil
+            whisperPausedReason = nil
 
         case .finished:
             whisperIsDownloading = false
             whisperDownloadProgress = nil
             whisperDownloadError = nil
+            whisperPausedReason = nil
 
             let modelToRefresh = activeModel == .none ? currentWhisperModelSelection : activeModel
             if modelToRefresh != .none {
@@ -152,6 +170,7 @@ final class SettingsViewModel: ObservableObject {
             whisperIsDownloading = false
             whisperDownloadProgress = nil
             whisperDownloadError = "Download/install failed: \(message)"
+            whisperPausedReason = nil
 
             let modelToRefresh = activeModel == .none ? currentWhisperModelSelection : activeModel
             if modelToRefresh != .none {

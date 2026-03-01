@@ -13,6 +13,7 @@ import Combine
 final class RecordingDetailViewModel: ObservableObject {
     let item: RecordingFile
     @AppStorage("settings.whisperModel") private var settingsWhisperModel: WhisperModelChoice = .none
+    @AppStorage("settings.summaryStyle") private var settingsSummaryStyle: String = "balanced"
 
     @Published var showDeleteConfirm: Bool = false
     @Published var deleteError: String? = nil
@@ -139,18 +140,30 @@ final class RecordingDetailViewModel: ObservableObject {
         }
 
         do {
-            let baseSummary = try await OnDeviceAIService.summarize(text)
+            let baseSummary = try await OnDeviceAIService.summarize(text, styleRawValue: settingsSummaryStyle)
             // Why: title/reference enrich output but should never block successful summary generation.
             let suggestedTitle = (try? await OnDeviceAIService.suggestTitle(text)) ?? "Recording \(item.createdAtFormatted)"
             let referenceResult = (try? await OnDeviceAIService.checkForFamousReference(text))
-                ?? OnDeviceAIService.ReferenceCheckResult(noteForSummary: nil, suggestedSongTitle: nil)
+                ?? OnDeviceAIService.ReferenceCheckResult(
+                    noteForSummary: nil,
+                    suggestedSongTitle: nil,
+                    dateTimeMentions: []
+                )
 
-            let summary: String
+            var summarySections: [String] = [baseSummary]
             if let note = referenceResult.noteForSummary, !note.isEmpty {
-                summary = "\(baseSummary)\n\nReference note: \(note)"
-            } else {
-                summary = baseSummary
+                summarySections.append("Reference note: \(note)")
             }
+
+            if !referenceResult.dateTimeMentions.isEmpty {
+                // Why: user asked to always surface detected date/time mentions at the bottom of the summary.
+                let dateTimeLines = referenceResult.dateTimeMentions
+                    .map { "- \($0)" }
+                    .joined(separator: "\n")
+                summarySections.append("Dates & Times:\n\(dateTimeLines)")
+            }
+
+            let summary = summarySections.joined(separator: "\n\n")
 
             summaryText = summary
             try fileService.saveSummary(summary, for: currentAudioURL)

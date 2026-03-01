@@ -14,9 +14,13 @@ struct RecordingDetailView: View {
     @ObservedObject var player: LibraryAudioPlayer
 
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("settings.shareStyle") private var shareStyle: ShareStylePreference = .audioOnly
     @StateObject private var vm: RecordingDetailViewModel
     @StateObject private var translationVM: SummaryTranslationViewModel
     @StateObject private var transcriptionTranslationVM: TranscriptionTranslationViewModel
+    @State private var shareItems: [Any] = []
+    @State private var isShareSheetPresented = false
+    private let shareService = RecordingShareService()
 
     init(item: RecordingFile, player: LibraryAudioPlayer) {
         self.item = item
@@ -68,6 +72,11 @@ struct RecordingDetailView: View {
         .onChange(of: vm.selectedWhisperLocale) { _, _ in
             HapticsService.selectionChanged()
         }
+        .sheet(isPresented: $isShareSheetPresented, onDismiss: {
+            shareItems = []
+        }) {
+            ActivityView(items: shareItems)
+        }
     }
 
     private var header: some View {
@@ -94,7 +103,9 @@ struct RecordingDetailView: View {
 
                 Spacer()
 
-                ShareLink(item: vm.currentAudioURL) {
+                Button {
+                    prepareShare()
+                } label: {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(width: 34, height: 34)
@@ -149,6 +160,18 @@ struct RecordingDetailView: View {
         .padding(14)
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func prepareShare() {
+        let items = shareService.makeShareItems(
+            audioURL: vm.currentAudioURL,
+            recordingTitle: vm.displayTitleForCurrentFile,
+            style: shareStyle
+        )
+        guard !items.isEmpty else { return }
+        shareItems = items
+        isShareSheetPresented = true
+        HapticsService.selectionChanged()
     }
 
     private var transcriptionCard: some View {

@@ -9,6 +9,8 @@ import SwiftUI
 
 struct SettingsWhisperSection: View {
     @Binding var whisperModel: WhisperModelChoice
+    @Binding var downloadOnWiFiOnly: Bool
+    @Binding var pauseOnLowPowerMode: Bool
     @ObservedObject var vm: SettingsViewModel
     @State private var showStopConfirmation = false
 
@@ -24,6 +26,20 @@ struct SettingsWhisperSection: View {
                     Text(model.displayName).tag(model)
                 }
             }
+
+            ToggleRow(
+                title: "Wi-Fi only downloads",
+                subtitle: "Avoid cellular/expensive networks",
+                systemImage: "wifi",
+                isOn: $downloadOnWiFiOnly
+            )
+
+            ToggleRow(
+                title: "Pause on Low Power Mode",
+                subtitle: "Auto-resume when Low Power Mode is off",
+                systemImage: "battery.25",
+                isOn: $pauseOnLowPowerMode
+            )
 
             if whisperModel == .none {
                 SettingsRow(
@@ -44,6 +60,12 @@ struct SettingsWhisperSection: View {
                     Text(whisperDownloadError)
                         .font(.footnote)
                         .foregroundStyle(.red)
+                }
+
+                if let pausedReason = vm.whisperPausedReason {
+                    Text(pausedReason)
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
                 }
 
                 if vm.whisperIsDownloading {
@@ -72,7 +94,14 @@ struct SettingsWhisperSection: View {
                             Label("Stop", systemImage: "stop.circle")
                         }
                     } else {
-                        if !isReady {
+                        if vm.whisperPausedReason != nil && !isReady {
+                            Button {
+                                HapticsService.selectionChanged()
+                                vm.resumeWhisperDownload(for: whisperModel)
+                            } label: {
+                                Label("Resume", systemImage: "play.circle")
+                            }
+                        } else if !isReady {
                             Button {
                                 HapticsService.impact(.medium)
                                 vm.startWhisperDownload(for: whisperModel)
