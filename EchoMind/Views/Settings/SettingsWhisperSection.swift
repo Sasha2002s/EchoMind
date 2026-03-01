@@ -10,6 +10,7 @@ import SwiftUI
 struct SettingsWhisperSection: View {
     @Binding var whisperModel: WhisperModelChoice
     @ObservedObject var vm: SettingsViewModel
+    @State private var showStopConfirmation = false
 
     var body: some View {
         Section("Local Whisper") {
@@ -65,30 +66,32 @@ struct SettingsWhisperSection: View {
                 HStack {
                     if vm.whisperIsDownloading {
                         Button(role: .destructive) {
-                            HapticsService.notify(.warning)
-                            vm.cancelWhisperDownload()
+                            // Why: stopping a large model download by accident is expensive for users.
+                            showStopConfirmation = true
                         } label: {
                             Label("Stop", systemImage: "stop.circle")
                         }
                     } else {
-                        Button {
-                            HapticsService.impact(.medium)
-                            vm.startWhisperDownload(for: whisperModel)
-                        } label: {
-                            Label("Download", systemImage: "arrow.down")
+                        if !isReady {
+                            Button {
+                                HapticsService.impact(.medium)
+                                vm.startWhisperDownload(for: whisperModel)
+                            } label: {
+                                Label("Download", systemImage: "arrow.down")
+                            }
                         }
-                        .disabled(vm.whisperModelReady || vm.whisperIsDownloading)
                     }
 
                     Spacer()
 
-                    Button(role: .destructive) {
-                        HapticsService.notify(.warning)
-                        vm.deleteWhisperModel(for: whisperModel)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                    if isReady && !vm.whisperIsDownloading {
+                        Button(role: .destructive) {
+                            HapticsService.notify(.warning)
+                            vm.deleteWhisperModel(for: whisperModel)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
-                    .disabled((!vm.whisperModelReady) || vm.whisperIsDownloading)
                 }
 
                 Text("Whisper runs fully on device. Download once, then you can transcribe without internet.")
@@ -105,6 +108,19 @@ struct SettingsWhisperSection: View {
             if newValue != nil {
                 HapticsService.notify(.error)
             }
+        }
+        .confirmationDialog(
+            "Stop model download?",
+            isPresented: $showStopConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Keep Downloading", role: .cancel) { }
+            Button("Stop Download", role: .destructive) {
+                HapticsService.notify(.warning)
+                vm.cancelWhisperDownload()
+            }
+        } message: {
+            Text("The current Whisper download will be canceled.")
         }
     }
 }

@@ -16,12 +16,14 @@ struct RecordingDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var vm: RecordingDetailViewModel
     @StateObject private var translationVM: SummaryTranslationViewModel
+    @StateObject private var transcriptionTranslationVM: TranscriptionTranslationViewModel
 
     init(item: RecordingFile, player: LibraryAudioPlayer) {
         self.item = item
         self.player = player
         _vm = StateObject(wrappedValue: RecordingDetailViewModel(item: item, player: player))
         _translationVM = StateObject(wrappedValue: SummaryTranslationViewModel(audioURL: item.url))
+        _transcriptionTranslationVM = StateObject(wrappedValue: TranscriptionTranslationViewModel(audioURL: item.url))
     }
 
     var body: some View {
@@ -55,6 +57,7 @@ struct RecordingDetailView: View {
         }
         .onChange(of: vm.currentAudioURL) { _, newURL in
             translationVM.syncAudioURL(newURL)
+            transcriptionTranslationVM.syncAudioURL(newURL)
         }
         .onChange(of: vm.selectedEngine) { _, _ in
             HapticsService.selectionChanged()
@@ -193,7 +196,7 @@ struct RecordingDetailView: View {
 
                     Menu {
                         Picker("Engine", selection: $vm.selectedEngine) {
-                            ForEach(TranscriptionEngine.allCases) { engine in
+                            ForEach(vm.availableEngines) { engine in
                                 Text(engine.title).tag(engine)
                             }
                         }
@@ -256,6 +259,8 @@ struct RecordingDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 6)
             } else {
+                let transcriptWordCount = wordCount(for: trimmedTranscript)
+
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         vm.isTranscriptHidden.toggle()
@@ -265,9 +270,16 @@ struct RecordingDetailView: View {
                     Label(vm.isTranscriptHidden ? "Show transcription" : "Hide transcription",
                           systemImage: vm.isTranscriptHidden ? "chevron.down" : "chevron.up")
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        // Why: this plain button behaves like a row control and should be fully tappable.
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+
+                Text("\(transcriptWordCount) words")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 if !vm.isTranscriptHidden {
                     Text(vm.transcriptText)
@@ -275,6 +287,11 @@ struct RecordingDetailView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                 }
+
+                TranscriptionTranslationSection(
+                    transcriptText: vm.transcriptText,
+                    viewModel: transcriptionTranslationVM
+                )
             }
 
             Divider().padding(.vertical, 4)
@@ -330,6 +347,8 @@ struct RecordingDetailView: View {
                         Label(vm.isSummaryHidden ? "Show summary" : "Hide summary",
                               systemImage: vm.isSummaryHidden ? "chevron.down" : "chevron.up")
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            // Why: this plain button behaves like a row control and should be fully tappable.
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
@@ -360,7 +379,7 @@ struct RecordingDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if let whisperStatus = vm.whisperStatus, vm.selectedEngine == .whisper {
+            if let whisperStatus = vm.whisperStatus, vm.selectedEngine.isWhisper {
                 Text(whisperStatus)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -370,6 +389,11 @@ struct RecordingDetailView: View {
         .padding(14)
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private func wordCount(for text: String) -> Int {
+        // Why: word count should stay language-friendly and ignore punctuation-heavy tokens.
+        text.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).count
     }
 
     private var deleteButton: some View {

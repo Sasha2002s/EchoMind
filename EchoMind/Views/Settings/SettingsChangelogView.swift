@@ -21,6 +21,17 @@ struct ChangelogView: View {
                     Label("Enabled haptics setting and wired feedback across major actions", systemImage: "iphone.radiowaves.left.and.right")
                     Label("Made Theme setting functional (system/light/dark)", systemImage: "circle.lefthalf.filled")
                     Label("Added Storage Usage screen with category graph + model breakdown", systemImage: "chart.bar.xaxis")
+                    Label("Added background Whisper model download with resume/cancel handling", systemImage: "arrow.down.circle")
+                    Label("Fixed Whisper Large model URL resolution/install flow + checksum verification", systemImage: "checkmark.shield")
+                    Label("Hid unavailable Whisper Large in engine picker and cleaned Download/Delete visibility", systemImage: "line.3.horizontal.decrease.circle")
+                    Label("Added default transcription/AI settings and auto-transcription after recording", systemImage: "slider.horizontal.3")
+                    Label("Added background transcription queue for longer recordings", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                    Label("Improved Recording Detail UX and playback scrubbing behavior", systemImage: "waveform.path.ecg")
+                    Label("Added chunked on-device summarization for long transcripts", systemImage: "text.badge.checkmark")
+                    Label("Added lyrics/famous phrase detection and smarter title renaming", systemImage: "music.note")
+                    Label("Added Library row context menu + tappable Home recents + recording pause", systemImage: "hand.tap")
+                    Label("Added transcription translation action and transcription word counter", systemImage: "character.bubble")
+                    Label("Fixed imported audio visibility in Library refresh/loading flow", systemImage: "books.vertical")
                 }
 
                 Section("February 28, 2026 (Yesterday)") {

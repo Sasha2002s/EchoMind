@@ -11,8 +11,6 @@ struct StorageUsageView: View {
     @State private var snapshot: StorageUsageSnapshot = .empty
     @State private var isLoading = true
 
-    private let storageService = StorageUsageService()
-
     var body: some View {
         List {
             if isLoading {
@@ -72,8 +70,9 @@ struct StorageUsageView: View {
     private func loadUsage() async {
         isLoading = true
         // Why: folder scans can touch many files, so run off the main actor.
+        // Create the service inside detached work to avoid MainActor capture warnings in Swift 6 mode.
         let loadedSnapshot = await Task.detached(priority: .userInitiated) {
-            storageService.loadSnapshot()
+            StorageUsageService().loadSnapshot()
         }.value
         snapshot = loadedSnapshot
         isLoading = false
@@ -169,4 +168,3 @@ private extension Int64 {
         StorageUsageView()
     }
 }
-

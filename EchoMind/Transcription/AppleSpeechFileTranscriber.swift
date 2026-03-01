@@ -13,6 +13,8 @@ import Foundation
 // MARK: - Apple Speech Transcription (file)
 
 final class AppleSpeechFileTranscriber {
+    nonisolated init() {}
+
     static func requestAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
         await withCheckedContinuation { cont in
             SFSpeechRecognizer.requestAuthorization { status in
@@ -86,5 +88,4 @@ final class AppleSpeechFileTranscriber {
         }
     }
 }
-
 

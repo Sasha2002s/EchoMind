@@ -9,11 +9,13 @@ import SwiftUI
 
 struct HomeView: View {
     let recordingRepository: any RecordingRepository
+    let player: LibraryAudioPlayer
 
     @State private var showingRecording = false
     @State private var recent: [RecordingFile] = []
     @State private var lastSavedURL: URL?
     @State private var showSavedBanner = false
+    @StateObject private var autoTranscriptionService = AutoTranscriptionService()
 
     var body: some View {
         NavigationStack {
@@ -30,11 +32,18 @@ struct HomeView: View {
                 .padding(.horizontal)
                 .padding(.top, 12)
             }
-            .task { await reloadRecent() }
+            .task {
+                await autoTranscriptionService.processQueuedTranscriptionsInForeground()
+                await reloadRecent()
+            }
             .sheet(isPresented: $showingRecording) {
                 RecordingView { url in
                     lastSavedURL = url
                     Task { await reloadRecent() }
+                    Task {
+                        await autoTranscriptionService.transcribeIfNeeded(audioURL: url)
+                        await reloadRecent()
+                    }
                     showSavedBanner = true
                 }
             }
@@ -55,7 +64,10 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView(recordingRepository: FileSystemRecordingRepository())
+    HomeView(
+        recordingRepository: FileSystemRecordingRepository(),
+        player: LibraryAudioPlayer()
+    )
 }
 
 // MARK: - UI
@@ -133,7 +145,11 @@ private extension HomeView {
             } else {
                 VStack(spacing: 10) {
                     ForEach(recent) { item in
-                        RecentRecordingRow(item: item)
+                        NavigationLink {
+                            RecordingDetailView(item: item, player: player)
+                        } label: {
+                            RecentRecordingRow(item: item)
+                        }
                     }
                 }
             }
@@ -200,16 +216,17 @@ private struct RecentRecordingRow: View {
 
             Spacer(minLength: 8)
 
-            ShareLink(item: item.url) {
-                Image(systemName: "square.and.arrow.up")
-            }
-            .accessibilityLabel("Export")
+            Image(systemName: "chevron.right")
+                .font(.footnote)
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(.thinMaterial)
         )
+        .contentShape(Rectangle())
     }
 }
 

@@ -19,11 +19,19 @@ final class SettingsViewModel: ObservableObject {
     @Published var whisperModelInstalledOnDisk: Bool = false
 
     private let whisperModelManager: WhisperModelManager
-    private var whisperDownloadTask: Task<Void, Never>? = nil
+    private let whisperBackgroundDownloadManager: WhisperBackgroundDownloadManager
+    private var cancellables = Set<AnyCancellable>()
+    private var currentWhisperModelSelection: WhisperModelChoice = .none
 
-    init(whisperModelManager: WhisperModelManager) {
+    init(
+        whisperModelManager: WhisperModelManager,
+        whisperBackgroundDownloadManager: WhisperBackgroundDownloadManager
+    ) {
         // Why: constructor injection keeps service wiring out of the view layer.
         self.whisperModelManager = whisperModelManager
+        self.whisperBackgroundDownloadManager = whisperBackgroundDownloadManager
+        bindBackgroundDownloadState()
+        whisperBackgroundDownloadManager.restoreIfNeeded()
     }
 
     var whisperModelReady: Bool {
@@ -31,6 +39,8 @@ final class SettingsViewModel: ObservableObject {
     }
 
     func refreshWhisperModelInstalledState(for model: WhisperModelChoice) {
+        currentWhisperModelSelection = model
+
         guard model != .none else {
             whisperModelInstalledOnDisk = false
             whisperModelDownloaded = false
@@ -49,28 +59,38 @@ final class SettingsViewModel: ObservableObject {
         if installed {
             whisperDownloadError = nil
         }
+
+        // Why: keep UI synced when user opens Settings while a background download is already active.
+        if whisperBackgroundDownloadManager.activeModel == model {
+            applyBackgroundDownloadState(
+                status: whisperBackgroundDownloadManager.status,
+                progress: whisperBackgroundDownloadManager.progress,
+                activeModel: model
+            )
+        }
     }
 
     func startWhisperDownload(for model: WhisperModelChoice) {
         guard model != .none else { return }
+        currentWhisperModelSelection = model
         refreshWhisperModelInstalledState(for: model)
         guard !whisperModelReady else { return }
-        guard !whisperIsDownloading else { return }
+        guard !whisperBackgroundDownloadManager.isBusy else { return }
 
-        whisperDownloadTask?.cancel()
-        whisperDownloadTask = Task {
-            await downloadWhisperModelIfNeeded(for: model)
-        }
+        whisperDownloadError = nil
+        whisperBackgroundDownloadManager.startDownload(for: model)
     }
 
     func cancelWhisperDownload() {
-        whisperDownloadTask?.cancel()
-        whisperDownloadTask = nil
+        whisperBackgroundDownloadManager.cancelDownload()
         whisperIsDownloading = false
         whisperDownloadProgress = nil
+        whisperDownloadError = nil
     }
 
     func deleteWhisperModel(for model: WhisperModelChoice) {
+        currentWhisperModelSelection = model
+        whisperBackgroundDownloadManager.cancelDownload()
         whisperDownloadError = nil
         whisperModelManager.deleteModel(for: model)
         whisperModelDownloaded = false
@@ -78,36 +98,70 @@ final class SettingsViewModel: ObservableObject {
         refreshWhisperModelInstalledState(for: model)
     }
 
-    private func downloadWhisperModelIfNeeded(for model: WhisperModelChoice) async {
-        whisperDownloadError = nil
-        whisperDownloadProgress = nil
-        whisperIsDownloading = true
-        defer {
+    private func bindBackgroundDownloadState() {
+        Publishers.CombineLatest3(
+            whisperBackgroundDownloadManager.$status,
+            whisperBackgroundDownloadManager.$progress,
+            whisperBackgroundDownloadManager.$activeModel
+        )
+        .receive(on: DispatchQueue.main)
+        .sink { [weak self] status, progress, activeModel in
+            self?.applyBackgroundDownloadState(status: status, progress: progress, activeModel: activeModel)
+        }
+        .store(in: &cancellables)
+    }
+
+    private func applyBackgroundDownloadState(
+        status: WhisperBackgroundDownloadManager.Status,
+        progress: Double?,
+        activeModel: WhisperModelChoice
+    ) {
+        switch status {
+        case .idle:
             whisperIsDownloading = false
             whisperDownloadProgress = nil
-            whisperDownloadTask = nil
-        }
 
-        do {
-            try await whisperModelManager.downloadModel(for: model) { progress in
-                await MainActor.run {
-                    self.whisperDownloadProgress = progress
-                }
+        case .preparing:
+            whisperIsDownloading = true
+            whisperDownloadProgress = nil
+            whisperDownloadError = nil
+
+        case .downloading:
+            whisperIsDownloading = true
+            whisperDownloadProgress = progress
+            whisperDownloadError = nil
+
+        case .installing:
+            whisperIsDownloading = true
+            whisperDownloadProgress = nil
+            whisperDownloadError = nil
+
+        case .finished:
+            whisperIsDownloading = false
+            whisperDownloadProgress = nil
+            whisperDownloadError = nil
+
+            let modelToRefresh = activeModel == .none ? currentWhisperModelSelection : activeModel
+            if modelToRefresh != .none {
+                let installed = whisperModelManager.isModelInstalled(for: modelToRefresh)
+                whisperModelInstalledOnDisk = installed
+                whisperModelDownloaded = installed
             }
 
-            whisperModelDownloaded = true
-            whisperModelInstalledOnDisk = true
-            whisperDownloadError = nil
-        } catch is CancellationError {
-            whisperDownloadError = nil
-            whisperModelDownloaded = false
-            whisperModelInstalledOnDisk = false
+        case .failed(let message):
+            whisperIsDownloading = false
             whisperDownloadProgress = nil
-        } catch {
-            whisperModelDownloaded = false
-            whisperModelInstalledOnDisk = false
-            whisperDownloadProgress = nil
-            whisperDownloadError = "Download/install failed: \(error.localizedDescription)"
+            whisperDownloadError = "Download/install failed: \(message)"
+
+            let modelToRefresh = activeModel == .none ? currentWhisperModelSelection : activeModel
+            if modelToRefresh != .none {
+                let installed = whisperModelManager.isModelInstalled(for: modelToRefresh)
+                whisperModelInstalledOnDisk = installed
+                whisperModelDownloaded = installed
+            } else {
+                whisperModelInstalledOnDisk = false
+                whisperModelDownloaded = false
+            }
         }
     }
 }

@@ -29,7 +29,10 @@ struct SettingsRow: View {
 
             Spacer(minLength: 8)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 2)
+        // Why: rows are used as labels for links/buttons, so the full row must be tappable.
+        .contentShape(Rectangle())
     }
 }
 

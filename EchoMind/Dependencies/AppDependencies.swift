@@ -28,20 +28,29 @@ final class AppDependencies: ObservableObject {
 
     static func live() -> AppDependencies {
         // Why: centralize app wiring in one place instead of constructing services in views.
-        AppDependencies(
+        let whisperModelManager = WhisperModelManager()
+        let whisperBackgroundDownloadManager = WhisperBackgroundDownloadManager.shared
+        return AppDependencies(
             recordingRepository: FileSystemRecordingRepository(),
             voiceMemoImportService: VoiceMemoImportService(),
             libraryAudioPlayer: LibraryAudioPlayer(),
-            settingsViewModel: SettingsViewModel(whisperModelManager: WhisperModelManager())
+            settingsViewModel: SettingsViewModel(
+                whisperModelManager: whisperModelManager,
+                whisperBackgroundDownloadManager: whisperBackgroundDownloadManager
+            )
         )
     }
 
     static func preview() -> AppDependencies {
-        AppDependencies(
+        let whisperModelManager = WhisperModelManager()
+        return AppDependencies(
             recordingRepository: PreviewRecordingRepository(),
             voiceMemoImportService: VoiceMemoImportService(),
             libraryAudioPlayer: LibraryAudioPlayer(),
-            settingsViewModel: SettingsViewModel(whisperModelManager: WhisperModelManager())
+            settingsViewModel: SettingsViewModel(
+                whisperModelManager: whisperModelManager,
+                whisperBackgroundDownloadManager: WhisperBackgroundDownloadManager.shared
+            )
         )
     }
 }

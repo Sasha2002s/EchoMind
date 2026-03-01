@@ -32,7 +32,9 @@ struct StorageUsageModelItem: Identifiable {
 }
 
 struct StorageUsageService {
-    func loadSnapshot() -> StorageUsageSnapshot {
+    nonisolated init() {}
+
+    nonisolated func loadSnapshot() -> StorageUsageSnapshot {
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         let audioBytes = sizeOfAudioFiles(in: documentsDirectory)
         let textBytes = sizeOfTextSidecars(in: documentsDirectory)
@@ -49,7 +51,7 @@ struct StorageUsageService {
         )
     }
 
-    private func sizeOfAudioFiles(in directory: URL?) -> Int64 {
+    private nonisolated func sizeOfAudioFiles(in directory: URL?) -> Int64 {
         let audioExtensions: Set<String> = [
             "m4a", "mp3", "wav", "aac", "caf", "aif", "aiff", "flac", "m4b"
         ]
@@ -59,20 +61,20 @@ struct StorageUsageService {
         }
     }
 
-    private func sizeOfTextSidecars(in directory: URL?) -> Int64 {
+    private nonisolated func sizeOfTextSidecars(in directory: URL?) -> Int64 {
         totalSize(in: directory) { url in
             url.pathExtension.lowercased() == "txt"
         }
     }
 
-    private func modelRootDirectory() -> URL {
+    private nonisolated func modelRootDirectory() -> URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport
             .appendingPathComponent("EchoMind", isDirectory: true)
             .appendingPathComponent("Models", isDirectory: true)
     }
 
-    private func loadModelItems(in root: URL) -> [StorageUsageModelItem] {
+    private nonisolated func loadModelItems(in root: URL) -> [StorageUsageModelItem] {
         guard FileManager.default.fileExists(atPath: root.path) else { return [] }
 
         let items = (try? FileManager.default.contentsOfDirectory(
@@ -92,7 +94,7 @@ struct StorageUsageService {
         }
     }
 
-    private func displayNameForModelItem(_ rawName: String) -> String {
+    private nonisolated func displayNameForModelItem(_ rawName: String) -> String {
         for choice in WhisperModelChoice.allCases where choice != .none {
             if choice.folderName == rawName {
                 return "Whisper \(choice.displayName)"
@@ -101,7 +103,7 @@ struct StorageUsageService {
         return rawName
     }
 
-    private func totalSize(in directory: URL?, includeFile: (URL) -> Bool) -> Int64 {
+    private nonisolated func totalSize(in directory: URL?, includeFile: (URL) -> Bool) -> Int64 {
         guard let directory else { return 0 }
 
         let enumerator = FileManager.default.enumerator(
@@ -120,7 +122,7 @@ struct StorageUsageService {
         return total
     }
 
-    private func recursiveItemSize(at url: URL) -> Int64 {
+    private nonisolated func recursiveItemSize(at url: URL) -> Int64 {
         var isDirectory: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
         guard exists else { return 0 }
@@ -143,10 +145,9 @@ struct StorageUsageService {
         return total
     }
 
-    private func fileSize(at url: URL) -> Int64 {
+    private nonisolated func fileSize(at url: URL) -> Int64 {
         let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
         guard values?.isRegularFile == true else { return 0 }
         return Int64(values?.fileSize ?? 0)
     }
 }
-

@@ -12,6 +12,7 @@ import Combine
 @MainActor
 final class RecordingDetailViewModel: ObservableObject {
     let item: RecordingFile
+    @AppStorage("settings.whisperModel") private var settingsWhisperModel: WhisperModelChoice = .none
 
     @Published var showDeleteConfirm: Bool = false
     @Published var deleteError: String? = nil
@@ -30,28 +31,41 @@ final class RecordingDetailViewModel: ObservableObject {
     @Published var isTranscribing: Bool = false
     @Published var whisperStatus: String? = nil
 
-    @Published var selectedEngine: TranscriptionEngine = .whisper
+    @AppStorage("settings.defaultTranscriptionModel") private var defaultTranscriptionModel: TranscriptionEngine = .appleSpeech
+    @Published var selectedEngine: TranscriptionEngine = .appleSpeech
     @Published var selectedSpeechLocale: SpeechLocaleOption = .system
     @Published var selectedWhisperLocale: SpeechLocaleOption = .system
-    @Published var selectedWhisperModel: WhisperModelOption = .base
+    @Published var isWhisperLargeAvailable: Bool = false
 
     private let player: LibraryAudioPlayer
     private let fileService: RecordingDetailFileService
     private let appleTranscriber: AppleSpeechFileTranscriber
     private let whisperTranscriber: WhisperFileTranscriber
+    private let whisperModelManager: WhisperModelManager
+
+    var availableEngines: [TranscriptionEngine] {
+        var engines: [TranscriptionEngine] = [.whisperBasic]
+        if isWhisperLargeAvailable {
+            engines.append(.whisperLarge)
+        }
+        engines.append(.appleSpeech)
+        return engines
+    }
 
     init(
         item: RecordingFile,
         player: LibraryAudioPlayer,
         fileService: RecordingDetailFileService? = nil,
         appleTranscriber: AppleSpeechFileTranscriber? = nil,
-        whisperTranscriber: WhisperFileTranscriber? = nil
+        whisperTranscriber: WhisperFileTranscriber? = nil,
+        whisperModelManager: WhisperModelManager? = nil
     ) {
         self.item = item
         self.player = player
         self.fileService = fileService ?? RecordingDetailFileService()
         self.appleTranscriber = appleTranscriber ?? AppleSpeechFileTranscriber()
         self.whisperTranscriber = whisperTranscriber ?? WhisperFileTranscriber()
+        self.whisperModelManager = whisperModelManager ?? WhisperModelManager()
         self.currentAudioURL = item.url
     }
 
@@ -64,6 +78,12 @@ final class RecordingDetailViewModel: ObservableObject {
     }
 
     func onAppear() {
+        refreshWhisperLargeAvailability()
+        selectedEngine = defaultTranscriptionModel
+        if selectedEngine == .whisperLarge && !isWhisperLargeAvailable {
+            // Why: avoid preselecting an engine the user cannot run yet.
+            selectedEngine = .whisperBasic
+        }
         loadTranscriptAndSummary()
     }
 
@@ -87,11 +107,21 @@ final class RecordingDetailViewModel: ObservableObject {
     }
 
     func transcribe() async {
+        refreshWhisperLargeAvailability()
+        if selectedEngine == .whisperLarge && !isWhisperLargeAvailable {
+            transcriptionError = "Whisper Large is not downloaded yet."
+            // Why: keep the picker in a valid state after blocking unavailable large model usage.
+            selectedEngine = .whisperBasic
+            return
+        }
+
         switch selectedEngine {
         case .appleSpeech:
             await transcribeWithAppleSpeech()
-        case .whisper:
-            await transcribeWithWhisper()
+        case .whisperBasic:
+            await transcribeWithWhisper(model: .base, preferLocalModel: false)
+        case .whisperLarge:
+            await transcribeWithWhisper(model: .largeV3, preferLocalModel: true)
         }
     }
 
@@ -111,9 +141,18 @@ final class RecordingDetailViewModel: ObservableObject {
         do {
             async let summaryTask = OnDeviceAIService.summarize(text)
             async let titleTask = OnDeviceAIService.suggestTitle(text)
+            async let referenceTask = OnDeviceAIService.checkForFamousReference(text)
 
-            let summary = try await summaryTask
+            let baseSummary = try await summaryTask
             let suggestedTitle = try await titleTask
+            let referenceResult = try await referenceTask
+
+            let summary: String
+            if let note = referenceResult.noteForSummary, !note.isEmpty {
+                summary = "\(baseSummary)\n\nReference note: \(note)"
+            } else {
+                summary = baseSummary
+            }
 
             summaryText = summary
             try fileService.saveSummary(summary, for: currentAudioURL)
@@ -122,14 +161,23 @@ final class RecordingDetailViewModel: ObservableObject {
                 player.stop()
             }
 
+            let preferredTitle = referenceResult.suggestedSongTitle?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let renameTitle = (preferredTitle?.isEmpty == false) ? preferredTitle! : suggestedTitle
+
             currentAudioURL = try fileService.renameRecordingAndSidecars(
                 audioURL: currentAudioURL,
-                newName: suggestedTitle,
+                newName: renameTitle,
                 locales: SpeechLocaleOption.allCases
             )
         } catch {
             summaryError = error.localizedDescription
         }
+    }
+
+    private func refreshWhisperLargeAvailability() {
+        // Why: picker options should reflect real model installation state.
+        isWhisperLargeAvailable = whisperModelManager.isModelInstalled(for: .largeV3_547)
     }
 
     private func loadTranscriptAndSummary() {
@@ -143,7 +191,7 @@ final class RecordingDetailViewModel: ObservableObject {
         summaryText = loaded.summary
     }
 
-    private func transcribeWithWhisper() async {
+    private func transcribeWithWhisper(model: WhisperModelOption, preferLocalModel: Bool) async {
         guard !isTranscribing else { return }
 
         transcriptionError = nil
@@ -162,13 +210,21 @@ final class RecordingDetailViewModel: ObservableObject {
         }
 
         do {
-            whisperStatus = "Transcribing (\(selectedWhisperLocale.shortTitle))..."
+            let localModelFolderPath = preferLocalModel
+                ? whisperModelManager.installedModelFolderPath(for: settingsWhisperModel)
+                : nil
+            if localModelFolderPath != nil {
+                whisperStatus = "Transcribing (\(selectedWhisperLocale.shortTitle), local model)..."
+            } else {
+                whisperStatus = "Transcribing (\(selectedWhisperLocale.shortTitle))..."
+            }
 
             let result = try await withTimeout(seconds: 120) {
                 try await self.whisperTranscriber.transcribeFile(
                     url: self.currentAudioURL,
-                    model: self.selectedWhisperModel,
-                    languageCode: self.selectedWhisperLocale.languageCode
+                    model: model,
+                    languageCode: self.selectedWhisperLocale.languageCode,
+                    localModelFolderPath: localModelFolderPath
                 )
             }
 

@@ -9,6 +9,7 @@ import SwiftUI
 
 @main
 struct EchoMindApp: App {
+    @UIApplicationDelegateAdaptor(BackgroundSessionAppDelegate.self) private var appDelegate
     @StateObject private var dependencies = AppDependencies.live()
     @AppStorage("settings.theme") private var theme: AppTheme = .system
 

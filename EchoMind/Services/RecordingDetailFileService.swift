@@ -9,13 +9,19 @@ import Foundation
 
 struct RecordingDetailFileService {
     private let fileManager: FileManager = .default
+    nonisolated init() {}
 
-    func sidecarTranscriptURL(for audioURL: URL) -> URL {
+    nonisolated func sidecarTranscriptURL(for audioURL: URL) -> URL {
         audioURL.deletingPathExtension().appendingPathExtension("txt")
     }
 
-    func sidecarSummaryURL(for audioURL: URL) -> URL {
+    nonisolated func sidecarSummaryURL(for audioURL: URL) -> URL {
         audioURL.deletingPathExtension().appendingPathExtension("summary.txt")
+    }
+
+    func sidecarTranslatedTranscriptURL(for audioURL: URL, locale: SpeechLocaleOption) -> URL {
+        let code = locale.languageCode ?? "system"
+        return audioURL.deletingPathExtension().appendingPathExtension("transcript.\(code).txt")
     }
 
     func sidecarTranslatedSummaryURL(for audioURL: URL, locale: SpeechLocaleOption) -> URL {
@@ -23,7 +29,7 @@ struct RecordingDetailFileService {
         return audioURL.deletingPathExtension().appendingPathExtension("summary.\(code).txt")
     }
 
-    func loadTranscriptAndSummary(for audioURL: URL) -> (transcript: String, summary: String) {
+    nonisolated func loadTranscriptAndSummary(for audioURL: URL) -> (transcript: String, summary: String) {
         let transcript = loadTextIfPresent(from: sidecarTranscriptURL(for: audioURL))
         let summary = loadTextIfPresent(from: sidecarSummaryURL(for: audioURL))
         return (transcript, summary)
@@ -34,12 +40,21 @@ struct RecordingDetailFileService {
         return loadTextIfPresent(from: url)
     }
 
-    func saveTranscript(_ text: String, for audioURL: URL) throws {
+    func loadTranslatedTranscriptIfPresent(for audioURL: URL, locale: SpeechLocaleOption) -> String {
+        let url = sidecarTranslatedTranscriptURL(for: audioURL, locale: locale)
+        return loadTextIfPresent(from: url)
+    }
+
+    nonisolated func saveTranscript(_ text: String, for audioURL: URL) throws {
         try Data(text.utf8).write(to: sidecarTranscriptURL(for: audioURL), options: [.atomic])
     }
 
     func saveSummary(_ text: String, for audioURL: URL) throws {
         try Data(text.utf8).write(to: sidecarSummaryURL(for: audioURL), options: [.atomic])
+    }
+
+    func saveTranslatedTranscript(_ text: String, for audioURL: URL, locale: SpeechLocaleOption) throws {
+        try Data(text.utf8).write(to: sidecarTranslatedTranscriptURL(for: audioURL, locale: locale), options: [.atomic])
     }
 
     func saveTranslatedSummary(_ text: String, for audioURL: URL, locale: SpeechLocaleOption) throws {
@@ -51,6 +66,7 @@ struct RecordingDetailFileService {
         try removeIfPresent(sidecarSummaryURL(for: audioURL))
 
         for locale in locales {
+            try removeIfPresent(sidecarTranslatedTranscriptURL(for: audioURL, locale: locale))
             try removeIfPresent(sidecarTranslatedSummaryURL(for: audioURL, locale: locale))
         }
 
@@ -83,6 +99,10 @@ struct RecordingDetailFileService {
 
         for locale in locales {
             try moveIfPresent(
+                from: sidecarTranslatedTranscriptURL(for: audioURL, locale: locale),
+                to: sidecarTranslatedTranscriptURL(for: newAudioURL, locale: locale)
+            )
+            try moveIfPresent(
                 from: sidecarTranslatedSummaryURL(for: audioURL, locale: locale),
                 to: sidecarTranslatedSummaryURL(for: newAudioURL, locale: locale)
             )
@@ -91,7 +111,7 @@ struct RecordingDetailFileService {
         return newAudioURL
     }
 
-    private func loadTextIfPresent(from url: URL) -> String {
+    private nonisolated func loadTextIfPresent(from url: URL) -> String {
         if let data = try? Data(contentsOf: url),
            let str = String(data: data, encoding: .utf8) {
             return str
@@ -110,7 +130,8 @@ struct RecordingDetailFileService {
         guard fileManager.fileExists(atPath: oldURL.path) else { return }
 
         if fileManager.fileExists(atPath: newURL.path) {
-            try? fileManager.removeItem(at: newURL)
+            // Why: replacing an existing sidecar should fail loudly if removal fails.
+            try fileManager.removeItem(at: newURL)
         }
 
         try fileManager.moveItem(at: oldURL, to: newURL)

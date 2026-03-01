@@ -15,6 +15,7 @@ import AVFoundation
 @MainActor
 final class AudioRecorderViewModel: ObservableObject {
     @Published var isRecording: Bool = false
+    @Published var isPaused: Bool = false
     @Published var duration: TimeInterval = 0
     @Published var statusText: String = ""
     @Published var waveformLevels: [CGFloat] = Array(repeating: 0.1, count: 24)
@@ -26,6 +27,10 @@ final class AudioRecorderViewModel: ObservableObject {
 
     private(set) var recordedURL: URL?
 
+    var hasActiveSession: Bool {
+        recordedURL != nil && (isRecording || isPaused)
+    }
+
     var formattedDuration: String {
         let total = Int(duration.rounded(.down))
         let minutes = total / 60
@@ -35,7 +40,7 @@ final class AudioRecorderViewModel: ObservableObject {
 
     var primaryActionDisabled: Bool {
         // Don’t allow finishing immediately by accident.
-        isRecording && duration < 0.4
+        (isRecording || isPaused) && duration < 0.4
     }
 
     func onAppear() {
@@ -46,6 +51,7 @@ final class AudioRecorderViewModel: ObservableObject {
         stopTimers()
         recorder?.stop()
         recorder = nil
+        isPaused = false
     }
 
     func startRecording() {
@@ -77,6 +83,7 @@ final class AudioRecorderViewModel: ObservableObject {
                 recordedURL = url
 
                 isRecording = true
+                isPaused = false
                 duration = 0
                 statusText = "Recording…"
 
@@ -89,10 +96,11 @@ final class AudioRecorderViewModel: ObservableObject {
     }
 
     func finishRecording() {
-        guard isRecording else { return }
+        guard hasActiveSession else { return }
         recorder?.stop()
         stopTimers()
         isRecording = false
+        isPaused = false
         statusText = "Saved recording."
 
         // Optional: release session so other audio can resume.
@@ -103,6 +111,7 @@ final class AudioRecorderViewModel: ObservableObject {
         recorder?.stop()
         stopTimers()
         isRecording = false
+        isPaused = false
         statusText = "Cancelled."
 
         if let url = recordedURL {
@@ -111,6 +120,24 @@ final class AudioRecorderViewModel: ObservableObject {
         recordedURL = nil
 
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    func pauseRecording() {
+        guard isRecording, let recorder else { return }
+        recorder.pause()
+        stopTimers()
+        isRecording = false
+        isPaused = true
+        statusText = "Paused."
+    }
+
+    func resumeRecording() {
+        guard isPaused, let recorder else { return }
+        recorder.record()
+        isRecording = true
+        isPaused = false
+        statusText = "Recording…"
+        startTimers()
     }
 
     // MARK: - Permissions

@@ -31,10 +31,9 @@ struct SettingsStorageSection: View {
                     subtitle: "Audio, text, and model size",
                     systemImage: "chart.pie"
                 )
+                // Why: custom row labels can otherwise only register taps on visible content.
+                .contentShape(Rectangle())
             }
-            .simultaneousGesture(TapGesture().onEnded {
-                HapticsService.selectionChanged()
-            })
         }
     }
 }

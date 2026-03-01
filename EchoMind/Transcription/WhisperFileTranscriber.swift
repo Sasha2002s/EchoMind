@@ -15,7 +15,14 @@ import WhisperKit
 
 
 final class WhisperFileTranscriber {
-    func transcribeFile(url: URL, model: WhisperModelOption, languageCode: String?) async throws -> String {
+    nonisolated init() {}
+
+    func transcribeFile(
+        url: URL,
+        model: WhisperModelOption,
+        languageCode: String?,
+        localModelFolderPath: String? = nil
+    ) async throws -> String {
         #if canImport(WhisperKit)
         // WhisperKit API can differ by version. This wrapper intentionally keeps the call site small.
         // If your WhisperKit version uses different types, adjust only inside this file.
@@ -25,7 +32,17 @@ final class WhisperFileTranscriber {
         // - Transcribe the audio file
         // Note: Depending on your WhisperKit version, you may need to provide a config.
 
-        let whisper = try await WhisperKit(model: model.modelId)
+        let whisper: WhisperKit
+        if let localModelFolderPath, !localModelFolderPath.isEmpty {
+            // Why: allow using app-downloaded local Whisper bundles instead of remote model ids.
+            let config = WhisperKitConfig(
+                modelFolder: localModelFolderPath,
+                download: false
+            )
+            whisper = try await WhisperKit(config)
+        } else {
+            whisper = try await WhisperKit(model: model.modelId)
+        }
         let result: Any
 
         if let languageCode, !languageCode.isEmpty {
@@ -108,4 +125,3 @@ final class WhisperFileTranscriber {
         return joined.isEmpty ? nil : joined
     }
 }
-

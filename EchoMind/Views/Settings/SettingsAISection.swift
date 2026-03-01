@@ -8,11 +8,23 @@
 import SwiftUI
 
 struct SettingsAISection: View {
+    @Binding var defaultAIModel: DefaultAIModel
     @Binding var summaryStyle: SummaryStyle
     @Binding var taskDetectionEnabled: Bool
 
     var body: some View {
         Section("AI Output") {
+            PickerRow(
+                title: "Default AI Model",
+                subtitle: defaultAIModel.displayName,
+                systemImage: "cpu",
+                selection: $defaultAIModel
+            ) {
+                ForEach(DefaultAIModel.allCases) { value in
+                    Text(value.displayName).tag(value)
+                }
+            }
+
             PickerRow(
                 title: "Summary Style",
                 subtitle: summaryStyle.displayName,
@@ -33,4 +45,3 @@ struct SettingsAISection: View {
         }
     }
 }
-

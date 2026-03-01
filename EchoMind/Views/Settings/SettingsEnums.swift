@@ -43,6 +43,18 @@ enum TranscriptionLanguage: String, CaseIterable, Identifiable {
     }
 }
 
+enum DefaultAIModel: String, CaseIterable, Identifiable {
+    case apple
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .apple: return "Apple"
+        }
+    }
+}
+
 enum SummaryStyle: String, CaseIterable, Identifiable {
     case short
     case balanced
@@ -76,4 +88,3 @@ enum KeepAudioPolicy: String, CaseIterable, Identifiable {
         }
     }
 }
-

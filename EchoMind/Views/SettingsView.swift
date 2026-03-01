@@ -12,7 +12,9 @@ struct SettingsView: View {
     @AppStorage("settings.haptics") private var hapticsEnabled: Bool = true
     @AppStorage("settings.sounds") private var soundsEnabled: Bool = false
 
+    @AppStorage("settings.defaultTranscriptionModel") private var defaultTranscriptionModel: TranscriptionEngine = .appleSpeech
     @AppStorage("settings.transcriptionLanguage") private var transcriptionLanguage: TranscriptionLanguage = .auto
+    @AppStorage("settings.defaultAIModel") private var defaultAIModel: DefaultAIModel = .apple
     @AppStorage("settings.summaryStyle") private var summaryStyle: SummaryStyle = .balanced
     @AppStorage("settings.taskDetection") private var taskDetectionEnabled: Bool = true
 
@@ -37,11 +39,13 @@ struct SettingsView: View {
                 )
 
                 SettingsRecordingSection(
+                    defaultTranscriptionModel: $defaultTranscriptionModel,
                     transcriptionLanguage: $transcriptionLanguage,
                     preventAutoLock: $preventAutoLock
                 )
 
                 SettingsAISection(
+                    defaultAIModel: $defaultAIModel,
                     summaryStyle: $summaryStyle,
                     taskDetectionEnabled: $taskDetectionEnabled
                 )
@@ -60,14 +64,16 @@ struct SettingsView: View {
             .onChange(of: whisperModel) { _, newValue in
                 vm.refreshWhisperModelInstalledState(for: newValue)
             }
-            .onDisappear {
-                vm.cancelWhisperDownload()
-            }
             .navigationTitle("Settings")
         }
     }
 }
 
 #Preview {
-    SettingsView(viewModel: SettingsViewModel(whisperModelManager: WhisperModelManager()))
+    SettingsView(
+        viewModel: SettingsViewModel(
+            whisperModelManager: WhisperModelManager(),
+            whisperBackgroundDownloadManager: WhisperBackgroundDownloadManager.shared
+        )
+    )
 }

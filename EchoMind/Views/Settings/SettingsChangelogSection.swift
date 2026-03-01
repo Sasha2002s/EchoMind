@@ -21,6 +21,8 @@ struct SettingsChangelogSection: View {
                     subtitle: "See recent changes",
                     systemImage: "sparkles"
                 )
+                // Why: keep the whole row tappable even with plain button styling.
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }

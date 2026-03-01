@@ -5,7 +5,10 @@ struct MainTabView: View {
 
     var body: some View {
         TabView {
-            HomeView(recordingRepository: dependencies.recordingRepository)
+            HomeView(
+                recordingRepository: dependencies.recordingRepository,
+                player: dependencies.libraryAudioPlayer
+            )
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }

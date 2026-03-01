@@ -16,9 +16,22 @@
 		CB0FDE1C2F502C8600F42130 /* EchoMind.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EchoMind.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CB39E7FC2F54A13400401622 /* Exceptions for "EchoMind" folder in "EchoMind" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CB0FDE1B2F502C8600F42130 /* EchoMind */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CB0FDE1E2F502C8600F42130 /* EchoMind */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CB39E7FC2F54A13400401622 /* Exceptions for "EchoMind" folder in "EchoMind" target */,
+			);
 			path = EchoMind;
 			sourceTree = "<group>";
 		};
@@ -274,7 +287,9 @@
 				DEVELOPMENT_TEAM = CB67LVHN9G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				INFOPLIST_FILE = EchoMind/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = EchoMind;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access to record your voice notes.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "EchoMind uses speech recognition to convert your voice recordings into text on your device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -310,7 +325,9 @@
 				DEVELOPMENT_TEAM = CB67LVHN9G;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = "";
+				INFOPLIST_FILE = EchoMind/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = EchoMind;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access to record your voice notes.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "EchoMind uses speech recognition to convert your voice recordings into text on your device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import os
 
 @MainActor
 final class LibraryAudioPlayer: NSObject, ObservableObject {
@@ -19,6 +20,10 @@ final class LibraryAudioPlayer: NSObject, ObservableObject {
     private var player: AVAudioPlayer?
     private var tick: AnyCancellable?
     private var shouldResumeAfterScrub = false
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "EchoMind",
+        category: "LibraryAudioPlayer"
+    )
 
     override init() {
         super.init()
@@ -81,7 +86,8 @@ final class LibraryAudioPlayer: NSObject, ObservableObject {
             stopTicking()
             currentTime = 0
             totalDuration = 0
-            print("Playback error:", error)
+            // Why: use structured logging instead of print for production diagnostics.
+            logger.error("Playback error: \(String(describing: error), privacy: .public)")
         }
     }
 

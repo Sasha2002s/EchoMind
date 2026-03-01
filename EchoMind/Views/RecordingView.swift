@@ -26,7 +26,7 @@ struct RecordingView: View {
             Spacer(minLength: 8)
 
             // Title
-            Text(vm.isRecording ? "Recording" : "Ready")
+            Text(vm.isRecording ? "Recording" : (vm.isPaused ? "Paused" : "Ready"))
                 .font(.title2.weight(.semibold))
 
             // Timer
@@ -61,8 +61,24 @@ struct RecordingView: View {
                 }
                 .buttonStyle(.bordered)
 
+                if vm.isRecording || vm.isPaused {
+                    Button {
+                        if vm.isRecording {
+                            HapticsService.selectionChanged()
+                            vm.pauseRecording()
+                        } else {
+                            HapticsService.selectionChanged()
+                            vm.resumeRecording()
+                        }
+                    } label: {
+                        Label(vm.isRecording ? "Pause" : "Resume", systemImage: vm.isRecording ? "pause.fill" : "play.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                }
+
                 Button {
-                    if vm.isRecording {
+                    if vm.hasActiveSession {
                         vm.finishRecording()
                         HapticsService.notify(.success)
                         if let url = vm.recordedURL {
@@ -74,7 +90,7 @@ struct RecordingView: View {
                         vm.startRecording()
                     }
                 } label: {
-                    Label(vm.isRecording ? "Finish" : "Start", systemImage: vm.isRecording ? "checkmark" : "mic.fill")
+                    Label(vm.hasActiveSession ? "Finish" : "Start", systemImage: vm.hasActiveSession ? "checkmark" : "mic.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -83,7 +99,7 @@ struct RecordingView: View {
             .padding(.horizontal)
             .padding(.bottom, 10)
 
-            if let url = vm.recordedURL, !vm.isRecording {
+            if let url = vm.recordedURL, !vm.hasActiveSession {
                 ShareLink(item: url) {
                     Label("Export recording", systemImage: "square.and.arrow.up")
                         .frame(maxWidth: .infinity)
