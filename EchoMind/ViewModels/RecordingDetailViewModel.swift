@@ -139,13 +139,11 @@ final class RecordingDetailViewModel: ObservableObject {
         }
 
         do {
-            async let summaryTask = OnDeviceAIService.summarize(text)
-            async let titleTask = OnDeviceAIService.suggestTitle(text)
-            async let referenceTask = OnDeviceAIService.checkForFamousReference(text)
-
-            let baseSummary = try await summaryTask
-            let suggestedTitle = try await titleTask
-            let referenceResult = try await referenceTask
+            let baseSummary = try await OnDeviceAIService.summarize(text)
+            // Why: title/reference enrich output but should never block successful summary generation.
+            let suggestedTitle = (try? await OnDeviceAIService.suggestTitle(text)) ?? "Recording \(item.createdAtFormatted)"
+            let referenceResult = (try? await OnDeviceAIService.checkForFamousReference(text))
+                ?? OnDeviceAIService.ReferenceCheckResult(noteForSummary: nil, suggestedSongTitle: nil)
 
             let summary: String
             if let note = referenceResult.noteForSummary, !note.isEmpty {

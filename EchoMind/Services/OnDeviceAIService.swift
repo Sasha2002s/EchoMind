@@ -13,6 +13,9 @@ enum OnDeviceAIService {
     private static let summaryReduceCharacterLimit = 3_600
     private static let maxSummaryReductionPasses = 3
     private static let metadataAnalysisCharacterLimit = 2_800
+    private static let fallbackSummaryChunkCharacterLimit = 1_500
+    private static let fallbackSummaryReduceCharacterLimit = 1_800
+    private static let fallbackMetadataAnalysisCharacterLimit = 1_200
 
     struct ReferenceCheckResult {
         let noteForSummary: String?
@@ -33,14 +36,18 @@ enum OnDeviceAIService {
 
         let transcriptChunks = chunkText(normalized, maxCharacters: summaryChunkCharacterLimit)
         if transcriptChunks.count == 1 {
-            return try await summarizeSingleTranscriptChunk(transcriptChunks[0], chunkIndex: 1, chunkCount: 1)
+            return try await summarizeSingleTranscriptChunkWithFallback(
+                transcriptChunks[0],
+                chunkIndex: 1,
+                chunkCount: 1
+            )
         }
 
         var partialSummaries: [String] = []
         partialSummaries.reserveCapacity(transcriptChunks.count)
 
         for (index, chunk) in transcriptChunks.enumerated() {
-            let chunkSummary = try await summarizeSingleTranscriptChunk(
+            let chunkSummary = try await summarizeSingleTranscriptChunkWithFallback(
                 chunk,
                 chunkIndex: index + 1,
                 chunkCount: transcriptChunks.count
@@ -58,13 +65,13 @@ enum OnDeviceAIService {
             reduced.reserveCapacity(reductionChunks.count)
 
             for chunk in reductionChunks {
-                reduced.append(try await compressIntermediateSummaryChunk(chunk, pass: pass))
+                reduced.append(try await compressIntermediateSummaryChunkWithFallback(chunk, pass: pass))
             }
 
             combinedSummary = reduced.joined(separator: "\n\n")
         }
 
-        return try await finalizeSummary(from: combinedSummary)
+        return try await finalizeSummaryWithFallback(from: combinedSummary)
     }
 
     static func checkForFamousReference(_ text: String) async throws -> ReferenceCheckResult {
@@ -73,7 +80,6 @@ enum OnDeviceAIService {
             return ReferenceCheckResult(noteForSummary: nil, suggestedSongTitle: nil)
         }
 
-        let session = LanguageModelSession()
         let source = sampledAnalysisText(from: text, maxCharacters: metadataAnalysisCharacterLimit)
         let prompt = """
         Analyze the transcript and detect whether it appears very close to either:
@@ -94,12 +100,44 @@ enum OnDeviceAIService {
         \(source)
         """
 
-        let response = try await session.respond(
-            to: prompt,
-            options: GenerationOptions(temperature: 0.0)
-        )
+        let responseContent: String
+        do {
+            let session = LanguageModelSession()
+            let response = try await session.respond(
+                to: prompt,
+                options: GenerationOptions(temperature: 0.0)
+            )
+            responseContent = response.content
+        } catch {
+            guard isContextWindowError(error) else { throw error }
+            let fallbackSource = sampledAnalysisText(from: text, maxCharacters: fallbackMetadataAnalysisCharacterLimit)
+            let fallbackPrompt = """
+            Analyze the transcript and detect whether it appears very close to either:
+            1) a known song lyric
+            2) a famous quote/phrase
 
-        let raw = response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+            Return EXACTLY one line in this strict format:
+            TYPE|TITLE|CONFIDENCE|NOTE
+
+            Rules:
+            - TYPE: NONE, LYRICS, or PHRASE
+            - TITLE: song/phrase name, or "-" if unknown
+            - CONFIDENCE: integer 0-100
+            - NOTE: short sentence (max 20 words), or "-" if none
+            - Do not include extra lines or explanations.
+
+            Transcript:
+            \(fallbackSource)
+            """
+            let retrySession = LanguageModelSession()
+            let response = try await retrySession.respond(
+                to: fallbackPrompt,
+                options: GenerationOptions(temperature: 0.0)
+            )
+            responseContent = response.content
+        }
+
+        let raw = responseContent.trimmingCharacters(in: .whitespacesAndNewlines)
         let parsed = parseReferenceLine(raw)
 
         guard let parsed else {
@@ -159,11 +197,23 @@ enum OnDeviceAIService {
         try ensureModelAvailable(for: "OnDeviceSummarizer", code: 3)
 
         let source = sampledAnalysisText(from: text, maxCharacters: metadataAnalysisCharacterLimit)
-        let session = LanguageModelSession()
         let prompt = "Generate a short title (3-6 words) for this transcript. Only output the title, nothing else.\n\n\(source)"
-        let response = try await session.respond(to: prompt)
 
-        let out = response.content
+        let responseContent: String
+        do {
+            let session = LanguageModelSession()
+            let response = try await session.respond(to: prompt)
+            responseContent = response.content
+        } catch {
+            guard isContextWindowError(error) else { throw error }
+            let fallbackSource = sampledAnalysisText(from: text, maxCharacters: fallbackMetadataAnalysisCharacterLimit)
+            let fallbackPrompt = "Generate a short title (3-6 words) for this transcript. Only output the title, nothing else.\n\n\(fallbackSource)"
+            let retrySession = LanguageModelSession()
+            let response = try await retrySession.respond(to: fallbackPrompt)
+            responseContent = response.content
+        }
+
+        let out = responseContent
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -236,6 +286,42 @@ enum OnDeviceAIService {
         )
     }
 
+    private static func summarizeSingleTranscriptChunkWithFallback(
+        _ chunk: String,
+        chunkIndex: Int,
+        chunkCount: Int
+    ) async throws -> String {
+        do {
+            return try await summarizeSingleTranscriptChunk(
+                chunk,
+                chunkIndex: chunkIndex,
+                chunkCount: chunkCount
+            )
+        } catch {
+            guard isContextWindowError(error) else { throw error }
+
+            let fallbackChunks = chunkText(chunk, maxCharacters: fallbackSummaryChunkCharacterLimit)
+            if fallbackChunks.count <= 1 {
+                throw error
+            }
+
+            var partials: [String] = []
+            partials.reserveCapacity(fallbackChunks.count)
+
+            for fallbackChunk in fallbackChunks {
+                partials.append(
+                    try await summarizeSingleTranscriptChunk(
+                        fallbackChunk,
+                        chunkIndex: chunkIndex,
+                        chunkCount: chunkCount
+                    )
+                )
+            }
+
+            return partials.joined(separator: "\n")
+        }
+    }
+
     private static func compressIntermediateSummaryChunk(_ chunk: String, pass: Int) async throws -> String {
         let session = LanguageModelSession()
         let prompt = """
@@ -260,6 +346,16 @@ enum OnDeviceAIService {
         )
     }
 
+    private static func compressIntermediateSummaryChunkWithFallback(_ chunk: String, pass: Int) async throws -> String {
+        do {
+            return try await compressIntermediateSummaryChunk(chunk, pass: pass)
+        } catch {
+            guard isContextWindowError(error) else { throw error }
+            let shrinkChunk = sampledAnalysisText(from: chunk, maxCharacters: fallbackSummaryReduceCharacterLimit)
+            return try await compressIntermediateSummaryChunk(shrinkChunk, pass: pass)
+        }
+    }
+
     private static func finalizeSummary(from combinedSummary: String) async throws -> String {
         let session = LanguageModelSession()
         let source = sampledAnalysisText(from: combinedSummary, maxCharacters: summaryReduceCharacterLimit)
@@ -282,6 +378,16 @@ enum OnDeviceAIService {
             code: 2,
             fallbackMessage: "Summary returned empty text."
         )
+    }
+
+    private static func finalizeSummaryWithFallback(from combinedSummary: String) async throws -> String {
+        do {
+            return try await finalizeSummary(from: combinedSummary)
+        } catch {
+            guard isContextWindowError(error) else { throw error }
+            let shrink = sampledAnalysisText(from: combinedSummary, maxCharacters: fallbackSummaryReduceCharacterLimit)
+            return try await finalizeSummary(from: shrink)
+        }
     }
 
     private static func nonEmptyOutput(
@@ -370,5 +476,22 @@ enum OnDeviceAIService {
         let start = text.index(text.startIndex, offsetBy: startOffset)
         let end = text.index(text.startIndex, offsetBy: endOffset)
         return String(text[start..<end])
+    }
+
+    private static func isContextWindowError(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        let combined = [
+            nsError.localizedDescription,
+            nsError.localizedFailureReason ?? "",
+            nsError.debugDescription
+        ]
+            .joined(separator: " ")
+            .lowercased()
+
+        return combined.contains("context window")
+            || combined.contains("context length")
+            || combined.contains("token limit")
+            || combined.contains("too many tokens")
+            || combined.contains("exceed")
     }
 }
