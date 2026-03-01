@@ -30,7 +30,6 @@ struct RecordingDetailView: View {
                 header
                 playbackCard
                 transcriptionCard
-                summarizeButton
                 deleteButton
             }
             .padding()
@@ -133,7 +132,14 @@ struct RecordingDetailView: View {
                         }
                     }
                 ),
-                in: 0...(max(player.isLoaded(id: item.id) ? player.totalDuration : item.duration, 0.01))
+                in: 0...(max(player.isLoaded(id: item.id) ? player.totalDuration : item.duration, 0.01)),
+                onEditingChanged: { isEditing in
+                    if isEditing {
+                        player.beginScrubbing()
+                    } else {
+                        player.endScrubbing()
+                    }
+                }
             )
             .disabled(!player.isLoaded(id: item.id))
         }
@@ -143,7 +149,7 @@ struct RecordingDetailView: View {
     }
 
     private var transcriptionCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("Transcription")
                     .font(.headline)
@@ -155,6 +161,27 @@ struct RecordingDetailView: View {
                         .scaleEffect(0.9)
                 }
             }
+
+            Button {
+                HapticsService.impact(.medium)
+                Task {
+                    await vm.transcribe()
+                    if vm.transcriptionError == nil {
+                        HapticsService.notify(.success)
+                    } else {
+                        HapticsService.notify(.error)
+                    }
+                }
+            } label: {
+                let hasTranscript = !vm.transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                Label(
+                    vm.isTranscribing ? "Transcribing..." : (hasTranscript ? "Re-transcribe" : "Transcribe"),
+                    systemImage: vm.selectedEngine.systemImage
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(vm.isTranscribing)
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
@@ -250,35 +277,72 @@ struct RecordingDetailView: View {
                 }
             }
 
-            let trimmedSummary = vm.summaryText.trimmingCharacters(in: .whitespacesAndNewlines)
+            Divider().padding(.vertical, 4)
 
-            if !trimmedSummary.isEmpty {
-                Divider().padding(.vertical, 4)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .center) {
+                    Text("Summary")
+                        .font(.headline)
 
-                Text("Summary")
-                    .font(.headline)
+                    Spacer()
 
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        vm.isSummaryHidden.toggle()
+                    Button {
+                        HapticsService.impact(.medium)
+                        Task {
+                            await vm.summarizeOnDevice()
+                            if vm.summaryError == nil {
+                                HapticsService.notify(.success)
+                            } else {
+                                HapticsService.notify(.error)
+                            }
+                        }
+                    } label: {
+                        let hasSummary = !vm.summaryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        Label(vm.isSummarizing ? "Summarizing..." : (hasSummary ? "Re-summarize" : "Summarize"), systemImage: "sparkles")
                     }
-                    HapticsService.selectionChanged()
-                } label: {
-                    Label(vm.isSummaryHidden ? "Show summary" : "Hide summary",
-                          systemImage: vm.isSummaryHidden ? "chevron.down" : "chevron.up")
+                    .buttonStyle(.bordered)
+                    .disabled(vm.isSummarizing || trimmedTranscript.isEmpty)
+                    .accessibilityHint("Creates a short on-device summary from the transcript")
+                }
+
+                if vm.isSummarizing {
+                    ProgressView("Generating summary…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
 
-                if !vm.isSummaryHidden {
-                    Text(vm.summaryText)
-                        .font(.body)
+                let trimmedSummary = vm.summaryText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                if trimmedSummary.isEmpty {
+                    Text(trimmedTranscript.isEmpty ? "Transcribe first, then summarize." : "No summary yet. Tap Summarize to generate one.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .textSelection(.enabled)
+                        .padding(.vertical, 6)
+                } else {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            vm.isSummaryHidden.toggle()
+                        }
+                        HapticsService.selectionChanged()
+                    } label: {
+                        Label(vm.isSummaryHidden ? "Show summary" : "Hide summary",
+                              systemImage: vm.isSummaryHidden ? "chevron.down" : "chevron.up")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
 
-                    Divider().padding(.vertical, 4)
-                    SummaryTranslationSection(summaryText: vm.summaryText, viewModel: translationVM)
+                    if !vm.isSummaryHidden {
+                        Text(vm.summaryText)
+                            .font(.body)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .textSelection(.enabled)
+
+                        Divider().padding(.vertical, 2)
+                        SummaryTranslationSection(summaryText: vm.summaryText, viewModel: translationVM)
+                    }
                 }
             }
 
@@ -302,52 +366,10 @@ struct RecordingDetailView: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            Button {
-                HapticsService.impact(.medium)
-                Task {
-                    await vm.transcribe()
-                    if vm.transcriptionError == nil {
-                        HapticsService.notify(.success)
-                    } else {
-                        HapticsService.notify(.error)
-                    }
-                }
-            } label: {
-                let hasTranscript = !vm.transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                Label(
-                    vm.isTranscribing ? "Transcribing..." : (hasTranscript ? "Re-transcribe" : "Transcribe"),
-                    systemImage: vm.selectedEngine.systemImage
-                )
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.bordered)
-            .disabled(vm.isTranscribing)
         }
         .padding(14)
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private var summarizeButton: some View {
-        Button {
-            HapticsService.impact(.medium)
-            Task {
-                await vm.summarizeOnDevice()
-                if vm.summaryError == nil {
-                    HapticsService.notify(.success)
-                } else {
-                    HapticsService.notify(.error)
-                }
-            }
-        } label: {
-            let hasSummary = !vm.summaryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            Label(vm.isSummarizing ? "Summarizing..." : (hasSummary ? "Re-summarize" : "Summarize"), systemImage: "sparkles")
-                .frame(maxWidth: .infinity)
-        }
-        .buttonStyle(.borderedProminent)
-        .disabled(vm.isSummarizing)
-        .accessibilityHint("Creates a short on-device summary from the transcript")
     }
 
     private var deleteButton: some View {

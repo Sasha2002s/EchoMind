@@ -14,6 +14,11 @@ protocol RecordingRepository {
 }
 
 struct FileSystemRecordingRepository: RecordingRepository {
+    // Why: imported files can be mp3/wav/etc., not only app-recorded m4a.
+    private let supportedAudioExtensions: Set<String> = [
+        "m4a", "mp3", "wav", "aac", "caf", "aif", "aiff", "flac", "m4b"
+    ]
+
     func loadAllRecordings() async -> [RecordingFile] {
         await loadRecordings(limit: nil)
     }
@@ -39,7 +44,7 @@ struct FileSystemRecordingRepository: RecordingRepository {
             return []
         }
 
-        let audioURLs = urls.filter { $0.pathExtension.lowercased() == "m4a" }
+        let audioURLs = urls.filter { supportedAudioExtensions.contains($0.pathExtension.lowercased()) }
         let items = await withTaskGroup(of: RecordingFile?.self) { group in
             for url in audioURLs {
                 group.addTask {
@@ -68,4 +73,3 @@ struct FileSystemRecordingRepository: RecordingRepository {
         return Array(sorted.prefix(limit))
     }
 }
-

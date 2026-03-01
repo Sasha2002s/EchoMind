@@ -18,6 +18,7 @@ final class LibraryAudioPlayer: NSObject, ObservableObject {
 
     private var player: AVAudioPlayer?
     private var tick: AnyCancellable?
+    private var shouldResumeAfterScrub = false
 
     override init() {
         super.init()
@@ -101,6 +102,28 @@ final class LibraryAudioPlayer: NSObject, ObservableObject {
         let clamped = max(0, min(seconds, totalDuration))
         p.currentTime = clamped
         currentTime = clamped
+    }
+
+    func beginScrubbing() {
+        guard let p = player else { return }
+        shouldResumeAfterScrub = p.isPlaying
+
+        // Why: pausing while dragging avoids loud seek artifacts during live playback.
+        if p.isPlaying {
+            p.pause()
+            isPlaying = false
+            stopTicking()
+        }
+    }
+
+    func endScrubbing() {
+        guard let p = player else { return }
+        defer { shouldResumeAfterScrub = false }
+
+        guard shouldResumeAfterScrub else { return }
+        p.play()
+        isPlaying = true
+        startTicking()
     }
 
     private func startTicking() {
