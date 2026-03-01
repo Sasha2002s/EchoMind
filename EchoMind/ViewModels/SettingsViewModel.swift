@@ -18,8 +18,13 @@ final class SettingsViewModel: ObservableObject {
     @Published var whisperDownloadError: String? = nil
     @Published var whisperModelInstalledOnDisk: Bool = false
 
-    private let whisperModelManager = WhisperModelManager()
+    private let whisperModelManager: WhisperModelManager
     private var whisperDownloadTask: Task<Void, Never>? = nil
+
+    init(whisperModelManager: WhisperModelManager) {
+        // Why: constructor injection keeps service wiring out of the view layer.
+        self.whisperModelManager = whisperModelManager
+    }
 
     var whisperModelReady: Bool {
         whisperModelDownloaded || whisperModelInstalledOnDisk

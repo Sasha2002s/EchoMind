@@ -13,6 +13,7 @@ import Translation
 struct SummaryTranslationSection: View {
     let summaryText: String
     @ObservedObject var viewModel: SummaryTranslationViewModel
+    @State private var awaitingTranslationResult = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -36,6 +37,8 @@ struct SummaryTranslationSection: View {
             }
 
             Button {
+                HapticsService.impact(.medium)
+                awaitingTranslationResult = true
                 Task { await viewModel.translate(summaryText: summaryText) }
             } label: {
                 Label(viewModel.isTranslating ? "Translating..." : "Translate", systemImage: "arrow.left.arrow.right")
@@ -63,6 +66,21 @@ struct SummaryTranslationSection: View {
         }
         .onChange(of: summaryText) { _, newValue in
             viewModel.handleSummaryChange(newValue)
+        }
+        .onChange(of: viewModel.selectedLocale) { _, _ in
+            HapticsService.selectionChanged()
+        }
+        .onChange(of: viewModel.translatedSummaryText) { _, newValue in
+            if awaitingTranslationResult && !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                HapticsService.notify(.success)
+                awaitingTranslationResult = false
+            }
+        }
+        .onChange(of: viewModel.translationError) { _, newValue in
+            if awaitingTranslationResult && newValue != nil {
+                HapticsService.notify(.error)
+                awaitingTranslationResult = false
+            }
         }
 #if canImport(Translation)
         .translationTask(viewModel.translationConfiguration) { session in

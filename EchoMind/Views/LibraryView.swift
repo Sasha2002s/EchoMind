@@ -6,11 +6,17 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct LibraryView: View {
+    let recordingRepository: any RecordingRepository
+    let voiceMemoImportService: any VoiceMemoImporting
+    @ObservedObject var player: LibraryAudioPlayer
+
     @State private var recordings: [RecordingFile] = []
     @State private var isLoading = false
-    @StateObject private var player = LibraryAudioPlayer()
+    @State private var showFileImporter = false
+    @State private var importMessage: ImportMessage?
 
     var body: some View {
         NavigationStack {
@@ -38,6 +44,31 @@ struct LibraryView: View {
                 }
             }
             .navigationTitle("Library")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        HapticsService.selectionChanged()
+                        showFileImporter = true
+                    } label: {
+                        Image(systemName: "waveform.badge.plus")
+                    }
+                    .accessibilityLabel("Import Voice Memo")
+                }
+            }
+            .fileImporter(
+                isPresented: $showFileImporter,
+                allowedContentTypes: [.audio],
+                allowsMultipleSelection: false
+            ) { result in
+                Task { await handleImport(result: result) }
+            }
+            .alert(item: $importMessage) { message in
+                Alert(
+                    title: Text(message.title),
+                    message: Text(message.body),
+                    dismissButton: .default(Text("OK"))
+                )
+            }
             .onAppear { Task { await reload() } }
             .refreshable { await reload() }
             .onDisappear { player.stop() }
@@ -49,8 +80,49 @@ struct LibraryView: View {
         isLoading = true
         defer { isLoading = false }
 
-        let loaded = await RecordingFileLoader.loadRecordingsFromDocuments()
+        // Why: use one repository for both Library and Home lists.
+        let loaded = await recordingRepository.loadAllRecordings()
         recordings = loaded
+    }
+
+    @MainActor
+    private func handleImport(result: Result<[URL], Error>) async {
+        switch result {
+        case .success(let urls):
+            guard let sourceURL = urls.first else {
+                importMessage = ImportMessage(
+                    title: "Import failed",
+                    body: "No file was selected."
+                )
+                return
+            }
+
+            do {
+                let importedURL = try voiceMemoImportService.importAudioFile(from: sourceURL)
+                await reload()
+                HapticsService.notify(.success)
+                importMessage = ImportMessage(
+                    title: "Voice memo imported",
+                    body: importedURL.lastPathComponent
+                )
+            } catch {
+                HapticsService.notify(.error)
+                importMessage = ImportMessage(
+                    title: "Import failed",
+                    body: error.localizedDescription
+                )
+            }
+        case .failure(let error):
+            let nsError = error as NSError
+            if nsError.domain == NSCocoaErrorDomain && nsError.code == NSUserCancelledError {
+                return
+            }
+            HapticsService.notify(.error)
+            importMessage = ImportMessage(
+                title: "Import failed",
+                body: error.localizedDescription
+            )
+        }
     }
 }
 
@@ -71,7 +143,17 @@ enum LibraryView_PreviewsHelper {
 #endif
 
 #Preview("Library") {
-    LibraryView()
+    LibraryView(
+        recordingRepository: FileSystemRecordingRepository(),
+        voiceMemoImportService: VoiceMemoImportService(),
+        player: LibraryAudioPlayer()
+    )
+}
+
+private struct ImportMessage: Identifiable {
+    let id = UUID()
+    let title: String
+    let body: String
 }
 
 // MARK: - Row

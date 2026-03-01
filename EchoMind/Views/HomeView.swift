@@ -6,9 +6,10 @@
 //
 
 import SwiftUI
-import Foundation
 
 struct HomeView: View {
+    let recordingRepository: any RecordingRepository
+
     @State private var showingRecording = false
     @State private var recent: [RecordingFile] = []
     @State private var lastSavedURL: URL?
@@ -29,11 +30,11 @@ struct HomeView: View {
                 .padding(.horizontal)
                 .padding(.top, 12)
             }
-            .task { reloadRecent() }
+            .task { await reloadRecent() }
             .sheet(isPresented: $showingRecording) {
                 RecordingView { url in
                     lastSavedURL = url
-                    reloadRecent()
+                    Task { await reloadRecent() }
                     showSavedBanner = true
                 }
             }
@@ -54,7 +55,7 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView()
+    HomeView(recordingRepository: FileSystemRecordingRepository())
 }
 
 // MARK: - UI
@@ -77,6 +78,7 @@ private extension HomeView {
     var recordCard: some View {
         VStack(spacing: 14) {
             Button {
+                HapticsService.impact(.medium)
                 showingRecording = true
             } label: {
                 ZStack {
@@ -140,9 +142,10 @@ private extension HomeView {
         .padding(.top, 2)
     }
 
-    func reloadRecent() {
-        // Why: keep all filesystem access out of the view layer.
-        recent = RecentRecordingService.loadRecent(limit: 3)
+    @MainActor
+    func reloadRecent() async {
+        // Why: keep filesystem concerns in a repository so the view stays UI-only.
+        recent = await recordingRepository.loadRecentRecordings(limit: 3)
     }
 }
 

@@ -8,13 +8,13 @@
 import SwiftUI
 
 struct ContentView: View {
+    let dependencies: AppDependencies
+
     var body: some View {
-        
-        MainTabView()
-        
+        MainTabView(dependencies: dependencies)
     }
 }
 
 #Preview {
-    ContentView()
+    ContentView(dependencies: AppDependencies.preview())
 }

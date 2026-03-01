@@ -1,21 +1,25 @@
 import SwiftUI
 
 struct MainTabView: View {
+    let dependencies: AppDependencies
+
     var body: some View {
         TabView {
-            
-                HomeView()
-            
+            HomeView(recordingRepository: dependencies.recordingRepository)
                 .tabItem {
                     Label("Home", systemImage: "house")
                 }
 
-            LibraryView()
+            LibraryView(
+                recordingRepository: dependencies.recordingRepository,
+                voiceMemoImportService: dependencies.voiceMemoImportService,
+                player: dependencies.libraryAudioPlayer
+            )
                 .tabItem {
                     Label("Library", systemImage: "books.vertical")
                 }
 
-            SettingsView()
+            SettingsView(viewModel: dependencies.settingsViewModel)
                 .tabItem {
                     Label("Settings", systemImage: "gearshape")
                 }
@@ -24,5 +28,5 @@ struct MainTabView: View {
 }
 
 #Preview {
-    MainTabView()
+    MainTabView(dependencies: AppDependencies.preview())
 }

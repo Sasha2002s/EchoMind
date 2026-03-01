@@ -52,6 +52,7 @@ struct RecordingView: View {
             // Actions
             HStack(spacing: 14) {
                 Button(role: .destructive) {
+                    HapticsService.notify(.warning)
                     vm.cancelRecording()
                     dismiss()
                 } label: {
@@ -63,11 +64,13 @@ struct RecordingView: View {
                 Button {
                     if vm.isRecording {
                         vm.finishRecording()
+                        HapticsService.notify(.success)
                         if let url = vm.recordedURL {
                             onFinished(url)
                         }
                         dismiss()
                     } else {
+                        HapticsService.impact(.medium)
                         vm.startRecording()
                     }
                 } label: {
@@ -92,6 +95,11 @@ struct RecordingView: View {
         .padding(.top)
         .onAppear { vm.onAppear() }
         .onDisappear { vm.onDisappear() }
+        .onChange(of: vm.showMicAlert) { _, isShown in
+            if isShown {
+                HapticsService.notify(.error)
+            }
+        }
         .alert("Microphone Access Needed", isPresented: $vm.showMicAlert) {
             Button("OK") { }
         } message: {
@@ -128,4 +136,3 @@ struct WaveformView: View {
         .accessibilityHidden(true)
     }
 }
-

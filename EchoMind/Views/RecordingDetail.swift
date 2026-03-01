@@ -45,11 +45,26 @@ struct RecordingDetailView: View {
         }
         .onChange(of: vm.didDeleteRecording) { _, didDelete in
             if didDelete {
+                HapticsService.notify(.success)
                 dismiss()
+            }
+        }
+        .onChange(of: vm.deleteError) { _, newError in
+            if newError != nil {
+                HapticsService.notify(.error)
             }
         }
         .onChange(of: vm.currentAudioURL) { _, newURL in
             translationVM.syncAudioURL(newURL)
+        }
+        .onChange(of: vm.selectedEngine) { _, _ in
+            HapticsService.selectionChanged()
+        }
+        .onChange(of: vm.selectedSpeechLocale) { _, _ in
+            HapticsService.selectionChanged()
+        }
+        .onChange(of: vm.selectedWhisperLocale) { _, _ in
+            HapticsService.selectionChanged()
         }
     }
 
@@ -87,6 +102,7 @@ struct RecordingDetailView: View {
                 .accessibilityLabel("Export audio")
 
                 Button {
+                    HapticsService.impact(.light)
                     player.toggle(url: vm.currentAudioURL, id: item.id)
                 } label: {
                     Image(systemName: player.isPlaying(id: item.id) ? "pause.fill" : "play.fill")
@@ -217,6 +233,7 @@ struct RecordingDetailView: View {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         vm.isTranscriptHidden.toggle()
                     }
+                    HapticsService.selectionChanged()
                 } label: {
                     Label(vm.isTranscriptHidden ? "Show transcription" : "Hide transcription",
                           systemImage: vm.isTranscriptHidden ? "chevron.down" : "chevron.up")
@@ -245,6 +262,7 @@ struct RecordingDetailView: View {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         vm.isSummaryHidden.toggle()
                     }
+                    HapticsService.selectionChanged()
                 } label: {
                     Label(vm.isSummaryHidden ? "Show summary" : "Hide summary",
                           systemImage: vm.isSummaryHidden ? "chevron.down" : "chevron.up")
@@ -286,7 +304,15 @@ struct RecordingDetailView: View {
             }
 
             Button {
-                Task { await vm.transcribe() }
+                HapticsService.impact(.medium)
+                Task {
+                    await vm.transcribe()
+                    if vm.transcriptionError == nil {
+                        HapticsService.notify(.success)
+                    } else {
+                        HapticsService.notify(.error)
+                    }
+                }
             } label: {
                 let hasTranscript = !vm.transcriptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 Label(
@@ -305,7 +331,15 @@ struct RecordingDetailView: View {
 
     private var summarizeButton: some View {
         Button {
-            Task { await vm.summarizeOnDevice() }
+            HapticsService.impact(.medium)
+            Task {
+                await vm.summarizeOnDevice()
+                if vm.summaryError == nil {
+                    HapticsService.notify(.success)
+                } else {
+                    HapticsService.notify(.error)
+                }
+            }
         } label: {
             let hasSummary = !vm.summaryText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             Label(vm.isSummarizing ? "Summarizing..." : (hasSummary ? "Re-summarize" : "Summarize"), systemImage: "sparkles")
@@ -318,6 +352,7 @@ struct RecordingDetailView: View {
 
     private var deleteButton: some View {
         Button(role: .destructive) {
+            HapticsService.notify(.warning)
             vm.showDeleteConfirm = true
         } label: {
             Label("Delete recording", systemImage: "trash")
@@ -330,9 +365,12 @@ struct RecordingDetailView: View {
             titleVisibility: .visible
         ) {
             Button("Delete", role: .destructive) {
+                HapticsService.notify(.warning)
                 Task { await vm.deleteRecording() }
             }
-            Button("Cancel", role: .cancel) {}
+            Button("Cancel", role: .cancel) {
+                HapticsService.selectionChanged()
+            }
         } message: {
             Text("This will permanently delete the audio and its transcription.")
         }

@@ -9,9 +9,25 @@ import SwiftUI
 
 @main
 struct EchoMindApp: App {
+    @StateObject private var dependencies = AppDependencies.live()
+    @AppStorage("settings.theme") private var theme: AppTheme = .system
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(dependencies: dependencies)
+                .preferredColorScheme(preferredColorScheme)
+        }
+    }
+
+    private var preferredColorScheme: ColorScheme? {
+        // Why: apply the user's theme choice globally instead of showing a non-functional setting.
+        switch theme {
+        case .system:
+            return nil
+        case .light:
+            return .light
+        case .dark:
+            return .dark
         }
     }
 }
