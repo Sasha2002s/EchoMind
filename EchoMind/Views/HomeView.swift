@@ -7,7 +7,6 @@
 
 import SwiftUI
 import Foundation
-import AVFoundation
 
 struct HomeView: View {
     @State private var showingRecording = false
@@ -140,6 +139,11 @@ private extension HomeView {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.top, 2)
     }
+
+    func reloadRecent() {
+        // Why: keep all filesystem access out of the view layer.
+        recent = RecentRecordingService.loadRecent(limit: 3)
+    }
 }
 
 // MARK: - Components
@@ -231,54 +235,5 @@ private struct SavedBannerView: View {
                 .fill(.ultraThinMaterial)
         )
         .padding(.horizontal)
-    }
-}
-
-// MARK: - Recent loader
-
-private extension HomeView {
-    func reloadRecent() {
-        recent = RecentRecordingLoader.load(limit: 3)
-    }
-}
-
-private enum RecentRecordingLoader {
-    static func load(limit: Int) -> [RecordingFile] {
-        guard let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            return []
-        }
-
-        let urls: [URL]
-        do {
-            urls = try FileManager.default.contentsOfDirectory(
-                at: dir,
-                includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey],
-                options: [.skipsHiddenFiles]
-            )
-        } catch {
-            return []
-        }
-
-        let m4a = urls.filter { $0.pathExtension.lowercased() == "m4a" }
-
-        let items: [RecordingFile] = m4a.compactMap { url in
-            let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey])
-            let created = values?.creationDate ?? values?.contentModificationDate ?? Date.distantPast
-
-            // Duration from the audio file (avoids deprecated AVAsset.duration access on iOS 16+).
-            let safeDuration: TimeInterval = (try? AVAudioPlayer(contentsOf: url).duration) ?? 0
-
-            return RecordingFile(
-                id: url.lastPathComponent,
-                url: url,
-                createdAt: created,
-                duration: safeDuration
-            )
-        }
-
-        return items
-            .sorted { $0.createdAt > $1.createdAt }
-            .prefix(max(0, limit))
-            .map { $0 }
     }
 }
