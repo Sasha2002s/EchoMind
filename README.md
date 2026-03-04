@@ -1,0 +1,3 @@
+Solo project that i hoped to monetize.
+The title EchoMind was one of titles that Chat GPT suggested for my app, i also asked him if there is such app already; it answered no...
+there is, that is why i ened this project, but if it would be helpful to anyone, please use)
