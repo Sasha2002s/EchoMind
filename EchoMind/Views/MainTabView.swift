@@ -29,7 +29,8 @@ struct MainTabView: View {
         }
     }
 }
-
+#if DEBUG
 #Preview {
     MainTabView(dependencies: AppDependencies.preview())
 }
+#endif

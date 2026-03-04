@@ -14,7 +14,8 @@ struct ContentView: View {
         MainTabView(dependencies: dependencies)
     }
 }
-
+#if DEBUG
 #Preview {
     ContentView(dependencies: AppDependencies.preview())
 }
+#endif

@@ -441,8 +441,9 @@ private struct RecordingRow: View {
         .accessibilityLabel("Open recording")
     }
 }
-
+#if DEBUG
 #Preview("Recording Row") {
     RecordingRow(item: LibraryView_PreviewsHelper.sampleRecordingFile())
         .padding()
 }
+#endif

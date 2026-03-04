@@ -450,7 +450,7 @@ struct RecordingDetailView: View {
         }
     }
 }
-
+#if DEBUG
 #Preview("Recording Detail") {
     NavigationStack {
         RecordingDetailView(
@@ -459,3 +459,4 @@ struct RecordingDetailView: View {
         )
     }
 }
+#endif

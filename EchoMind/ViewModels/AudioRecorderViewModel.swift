@@ -306,16 +306,20 @@ final class AudioRecorderViewModel: ObservableObject {
             object: AVAudioSession.sharedInstance(),
             queue: .main
         ) { [weak self] notification in
-            Task { @MainActor in
-                self?.handleAudioSessionInterruption(notification)
+            let userInfo = notification.userInfo
+            let typeRawValue = userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+            let optionsRawValue = userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+
+            // Why: capture only primitive values so the Task closure stays Sendable-safe in Swift 6 mode.
+            Task { @MainActor [weak self] in
+                guard let typeRawValue else { return }
+                self?.handleAudioSessionInterruption(typeRawValue: typeRawValue, optionsRawValue: optionsRawValue)
             }
         }
     }
 
-    private func handleAudioSessionInterruption(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let typeRawValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
-              let interruptionType = AVAudioSession.InterruptionType(rawValue: typeRawValue) else {
+    private func handleAudioSessionInterruption(typeRawValue: UInt, optionsRawValue: UInt) {
+        guard let interruptionType = AVAudioSession.InterruptionType(rawValue: typeRawValue) else {
             return
         }
 
@@ -335,7 +339,6 @@ final class AudioRecorderViewModel: ObservableObject {
             defer { wasInterruptedDuringRecording = false }
             guard wasInterruptedDuringRecording, hasActiveSession else { return }
 
-            let optionsRawValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
             let options = AVAudioSession.InterruptionOptions(rawValue: optionsRawValue)
 
             guard options.contains(.shouldResume) else {

@@ -130,11 +130,9 @@ struct RecordingExportService {
             try? FileManager.default.removeItem(at: outputURL)
         }
 
-        exporter.outputURL = outputURL
-        exporter.outputFileType = target.outputFileType
         exporter.shouldOptimizeForNetworkUse = true
 
-        try await runExport(exporter)
+        try await exporter.export(to: outputURL, as: target.outputFileType)
 
         guard FileManager.default.fileExists(atPath: outputURL.path) else {
             throw NSError(
@@ -147,35 +145,6 @@ struct RecordingExportService {
         let data = try Data(contentsOf: outputURL)
         try? FileManager.default.removeItem(at: outputURL)
         return data
-    }
-
-    private func runExport(_ exporter: AVAssetExportSession) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            exporter.exportAsynchronously {
-                switch exporter.status {
-                case .completed:
-                    continuation.resume(returning: ())
-                case .failed:
-                    continuation.resume(throwing: exporter.error ?? NSError(
-                        domain: "RecordingExportService",
-                        code: 24,
-                        userInfo: [NSLocalizedDescriptionKey: "Audio export failed."]
-                    ))
-                case .cancelled:
-                    continuation.resume(throwing: NSError(
-                        domain: "RecordingExportService",
-                        code: 25,
-                        userInfo: [NSLocalizedDescriptionKey: "Audio export was cancelled."]
-                    ))
-                default:
-                    continuation.resume(throwing: NSError(
-                        domain: "RecordingExportService",
-                        code: 26,
-                        userInfo: [NSLocalizedDescriptionKey: "Audio export did not complete."]
-                    ))
-                }
-            }
-        }
     }
 
     private func composeExportText(transcript: String, summary: String, markdown: Bool) -> String {

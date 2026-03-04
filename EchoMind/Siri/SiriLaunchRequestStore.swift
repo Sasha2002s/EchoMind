@@ -8,48 +8,51 @@
 import Foundation
 
 enum SiriLaunchRequestStore {
-    private static let startRecordingRequestKey = "siri.request.startRecording"
-    private static let stopRecordingRequestKey = "siri.request.stopRecording"
-    private static let playLastRecordingRequestKey = "siri.request.playLastRecording"
-
     nonisolated static func queueStartRecording() {
-        UserDefaults.standard.set(true, forKey: startRecordingRequestKey)
+        // Why: local literals avoid main-actor static-property isolation warnings under Swift 6 mode.
+        let key = "siri.request.startRecording"
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     nonisolated static func consumeStartRecordingRequest() -> Bool {
+        let key = "siri.request.startRecording"
         let defaults = UserDefaults.standard
-        let shouldStartRecording = defaults.bool(forKey: startRecordingRequestKey)
+        let shouldStartRecording = defaults.bool(forKey: key)
         if shouldStartRecording {
             // Why: consume-once prevents stale Siri requests from replaying on later app launches.
-            defaults.set(false, forKey: startRecordingRequestKey)
+            defaults.set(false, forKey: key)
         }
         return shouldStartRecording
     }
 
     nonisolated static func queueStopRecording() {
-        UserDefaults.standard.set(true, forKey: stopRecordingRequestKey)
+        let key = "siri.request.stopRecording"
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     nonisolated static func consumeStopRecordingRequest() -> Bool {
+        let key = "siri.request.stopRecording"
         let defaults = UserDefaults.standard
-        let shouldStopRecording = defaults.bool(forKey: stopRecordingRequestKey)
+        let shouldStopRecording = defaults.bool(forKey: key)
         if shouldStopRecording {
             // Why: consume-once prevents stale Siri requests from replaying on later app launches.
-            defaults.set(false, forKey: stopRecordingRequestKey)
+            defaults.set(false, forKey: key)
         }
         return shouldStopRecording
     }
 
     nonisolated static func queuePlayLastRecording() {
-        UserDefaults.standard.set(true, forKey: playLastRecordingRequestKey)
+        let key = "siri.request.playLastRecording"
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     nonisolated static func consumePlayLastRecordingRequest() -> Bool {
+        let key = "siri.request.playLastRecording"
         let defaults = UserDefaults.standard
-        let shouldPlayLastRecording = defaults.bool(forKey: playLastRecordingRequestKey)
+        let shouldPlayLastRecording = defaults.bool(forKey: key)
         if shouldPlayLastRecording {
             // Why: consume-once prevents stale Siri requests from replaying on later app launches.
-            defaults.set(false, forKey: playLastRecordingRequestKey)
+            defaults.set(false, forKey: key)
         }
         return shouldPlayLastRecording
     }

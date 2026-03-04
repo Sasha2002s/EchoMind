@@ -119,7 +119,7 @@ struct EchoMindTranscribeLastRecordingIntent: AppIntent {
     static var description = IntentDescription("Transcribes your latest recording using your current EchoMind settings.")
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
-        let service = SiriRecordingIntentService()
+        let service = await SiriRecordingIntentService()
         let transcriptResult = try await service.transcribeLastRecording()
         if transcriptResult.wasGenerated {
             return .result(value: transcriptResult.text, dialog: "Transcribed your latest recording.")
@@ -133,7 +133,7 @@ struct EchoMindSummarizeLastRecordingIntent: AppIntent {
     static var description = IntentDescription("Summarizes your latest recording, transcribing it first if needed.")
 
     func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
-        let service = SiriRecordingIntentService()
+        let service = await SiriRecordingIntentService()
         let summaryResult = try await service.summarizeLastRecording()
         if summaryResult.wasGenerated {
             return .result(value: summaryResult.text, dialog: "Summarized your latest recording.")
@@ -159,10 +159,10 @@ struct EchoMindPlayLastRecordingIntent: AppIntent {
     static var openAppWhenRun = true
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let service = SiriRecordingIntentService()
-        let latestRecording = try await service.lastRecording()
+        let service = await SiriRecordingIntentService()
+        let latestRecordingTitle = try await service.lastRecordingTitle()
         SiriLaunchRequestStore.queuePlayLastRecording()
-        return .result(dialog: "Opening EchoMind and playing \(latestRecording.displayTitle).")
+        return .result(dialog: "Opening EchoMind and playing \(latestRecordingTitle).")
     }
 }
 
@@ -174,7 +174,7 @@ struct EchoMindRenameLastRecordingIntent: AppIntent {
     var newName: String
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let service = SiriRecordingIntentService()
+        let service = await SiriRecordingIntentService()
         let renamedTitle = try await service.renameLastRecording(to: newName)
         return .result(dialog: "Renamed your latest recording to \(renamedTitle).")
     }
@@ -185,13 +185,14 @@ struct EchoMindDeleteLastRecordingIntent: AppIntent {
     static var description = IntentDescription("Deletes your latest recording and its related sidecar files.")
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let service = SiriRecordingIntentService()
+        let service = await SiriRecordingIntentService()
         let deletedTitle = try await service.deleteLastRecording()
         return .result(dialog: "Deleted your latest recording, \(deletedTitle).")
     }
 }
 
 private struct SiriRecordingIntentService {
+    // Why: keep this helper on the default main-actor isolation to avoid crossing non-Sendable dependencies.
     private static let defaultTranscriptionModelSettingKey = "settings.defaultTranscriptionModel"
     private static let transcriptionLanguageSettingKey = "settings.transcriptionLanguage"
     private static let summaryStyleSettingKey = "settings.summaryStyle"
@@ -204,7 +205,7 @@ private struct SiriRecordingIntentService {
     private let whisperModelManager: WhisperModelManager
     private let defaults: UserDefaults
 
-    nonisolated init(
+    init(
         repository: any RecordingRepository = FileSystemRecordingRepository(),
         fileService: RecordingDetailFileService = RecordingDetailFileService(),
         appleTranscriber: AppleSpeechFileTranscriber = AppleSpeechFileTranscriber(),
@@ -225,7 +226,7 @@ private struct SiriRecordingIntentService {
         let wasGenerated: Bool
     }
 
-    nonisolated func transcribeLastRecording() async throws -> TextResult {
+    func transcribeLastRecording() async throws -> TextResult {
         let recording = try await loadLastRecording()
         let existingTranscript = normalized(fileService.loadTranscriptAndSummary(for: recording.url).transcript)
         if !existingTranscript.isEmpty {
@@ -241,7 +242,7 @@ private struct SiriRecordingIntentService {
         return TextResult(text: transcript, wasGenerated: true)
     }
 
-    nonisolated func summarizeLastRecording() async throws -> TextResult {
+    func summarizeLastRecording() async throws -> TextResult {
         let recording = try await loadLastRecording()
         let loaded = fileService.loadTranscriptAndSummary(for: recording.url)
         let existingSummary = normalized(loaded.summary)
@@ -261,11 +262,17 @@ private struct SiriRecordingIntentService {
         return TextResult(text: summary, wasGenerated: true)
     }
 
-    nonisolated func lastRecording() async throws -> RecordingFile {
+    func lastRecording() async throws -> RecordingFile {
         try await loadLastRecording()
     }
 
-    nonisolated func renameLastRecording(to newName: String) async throws -> String {
+    func lastRecordingTitle() async throws -> String {
+        // Why: intents can pass plain strings safely without crossing actor-isolated model properties.
+        let recording = try await loadLastRecording()
+        return recording.displayTitle
+    }
+
+    func renameLastRecording(to newName: String) async throws -> String {
         let recording = try await loadLastRecording()
         let cleanedName = normalized(newName)
         guard !cleanedName.isEmpty else {
@@ -285,13 +292,13 @@ private struct SiriRecordingIntentService {
         return renamedURL.deletingPathExtension().lastPathComponent
     }
 
-    nonisolated func deleteLastRecording() async throws -> String {
+    func deleteLastRecording() async throws -> String {
         let recording = try await loadLastRecording()
         try fileService.deleteRecordingBundle(audioURL: recording.url, locales: SpeechLocaleOption.allCases)
         return recording.displayTitle
     }
 
-    private nonisolated func transcriptForSummary(from cachedTranscript: String, audioURL: URL) async throws -> String {
+    private func transcriptForSummary(from cachedTranscript: String, audioURL: URL) async throws -> String {
         let existingTranscript = normalized(cachedTranscript)
         if !existingTranscript.isEmpty {
             return existingTranscript
@@ -306,7 +313,7 @@ private struct SiriRecordingIntentService {
         return generatedTranscript
     }
 
-    private nonisolated func loadLastRecording() async throws -> RecordingFile {
+    private func loadLastRecording() async throws -> RecordingFile {
         let recent = await repository.loadRecentRecordings(limit: 1)
         guard let latest = recent.first else {
             throw SiriIntentError.noRecordings
@@ -314,7 +321,7 @@ private struct SiriRecordingIntentService {
         return latest
     }
 
-    private nonisolated func transcribeAudio(at audioURL: URL) async throws -> String {
+    private func transcribeAudio(at audioURL: URL) async throws -> String {
         let engineRawValue = defaults.string(forKey: Self.defaultTranscriptionModelSettingKey)
         let engine = TranscriptionEngine(rawValue: engineRawValue ?? "") ?? .appleSpeech
         let languageRawValue = defaults.string(forKey: Self.transcriptionLanguageSettingKey)
@@ -346,7 +353,7 @@ private struct SiriRecordingIntentService {
         }
     }
 
-    private nonisolated func locale(for language: TranscriptionLanguage) -> Locale {
+    private func locale(for language: TranscriptionLanguage) -> Locale {
         switch language {
         case .auto:
             return Locale.current
@@ -361,7 +368,7 @@ private struct SiriRecordingIntentService {
         }
     }
 
-    private nonisolated func whisperBasicLanguageCode(for language: TranscriptionLanguage) -> String? {
+    private func whisperBasicLanguageCode(for language: TranscriptionLanguage) -> String? {
         switch language {
         case .auto:
             return Locale.current.language.languageCode?.identifier
@@ -376,7 +383,7 @@ private struct SiriRecordingIntentService {
         }
     }
 
-    private nonisolated func whisperLargeLanguageCode(for language: TranscriptionLanguage) -> String? {
+    private func whisperLargeLanguageCode(for language: TranscriptionLanguage) -> String? {
         switch language {
         case .auto:
             // Why: for the large model, keep language auto-detection enabled by default.
@@ -392,7 +399,7 @@ private struct SiriRecordingIntentService {
         }
     }
 
-    private nonisolated func normalized(_ text: String) -> String {
+    private func normalized(_ text: String) -> String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

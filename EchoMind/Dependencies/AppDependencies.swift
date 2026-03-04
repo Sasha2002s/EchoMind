@@ -41,10 +41,13 @@ final class AppDependencies: ObservableObject {
         )
     }
 
+    #if DEBUG
     static func preview() -> AppDependencies {
         let whisperModelManager = WhisperModelManager()
         return AppDependencies(
+            
             recordingRepository: PreviewRecordingRepository(),
+            
             voiceMemoImportService: VoiceMemoImportService(),
             libraryAudioPlayer: LibraryAudioPlayer(),
             settingsViewModel: SettingsViewModel(
@@ -53,6 +56,7 @@ final class AppDependencies: ObservableObject {
             )
         )
     }
+    #endif
 }
 
 #if DEBUG
