@@ -41,6 +41,7 @@ final class WhisperBackgroundDownloadManager: NSObject, ObservableObject {
     private let whisperModelManager: WhisperModelManager
     private let defaults: UserDefaults
     private let contextStorageKey = "whisper.background-download.context.v1"
+    private let liveActivityManager = EchoMindLiveActivityManager.shared
 
     private var downloadTask: URLSessionDownloadTask?
     private var descriptorResolveTask: Task<Void, Never>?
@@ -48,6 +49,7 @@ final class WhisperBackgroundDownloadManager: NSObject, ObservableObject {
     private var lowPowerObserver: NSObjectProtocol?
     private var resumeData: Data?
     private var isPausingForLowPowerMode = false
+    private var cancellables = Set<AnyCancellable>()
 
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.background(withIdentifier: Self.sessionIdentifier)
@@ -64,6 +66,7 @@ final class WhisperBackgroundDownloadManager: NSObject, ObservableObject {
         self.whisperModelManager = whisperModelManager
         self.defaults = defaults
         super.init()
+        bindLiveActivityState()
         registerLowPowerObserver()
     }
 
@@ -332,6 +335,84 @@ final class WhisperBackgroundDownloadManager: NSObject, ObservableObject {
         request.allowsExpensiveNetworkAccess = !wifiOnlyEnabled
         request.allowsConstrainedNetworkAccess = !wifiOnlyEnabled
         return request
+    }
+
+    private func bindLiveActivityState() {
+        Publishers.CombineLatest3($status, $progress, $activeModel)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] status, progress, activeModel in
+                self?.syncModelDownloadLiveActivity(
+                    status: status,
+                    progress: progress,
+                    activeModel: activeModel
+                )
+            }
+            .store(in: &cancellables)
+    }
+
+    private func syncModelDownloadLiveActivity(
+        status: Status,
+        progress: Double?,
+        activeModel: WhisperModelChoice
+    ) {
+        let modelName = activeModel == .none ? "Whisper model" : activeModel.displayName
+
+        switch status {
+        case .idle:
+            liveActivityManager.cancelModelDownloadIfNeeded(modelName: modelName)
+
+        case .preparing:
+            guard activeModel != .none else { return }
+            liveActivityManager.upsertModelDownload(
+                modelName: modelName,
+                status: .preparing,
+                progress: nil,
+                detailText: "Preparing download..."
+            )
+
+        case .downloading:
+            guard activeModel != .none else { return }
+            liveActivityManager.upsertModelDownload(
+                modelName: modelName,
+                status: .downloading,
+                progress: progress,
+                detailText: nil
+            )
+
+        case .pausedLowPower:
+            guard activeModel != .none else { return }
+            liveActivityManager.upsertModelDownload(
+                modelName: modelName,
+                status: .paused,
+                progress: progress,
+                detailText: "Paused in Low Power Mode."
+            )
+
+        case .installing:
+            guard activeModel != .none else { return }
+            liveActivityManager.upsertModelDownload(
+                modelName: modelName,
+                status: .installing,
+                progress: 1,
+                detailText: "Installing model..."
+            )
+
+        case .finished:
+            guard activeModel != .none else { return }
+            liveActivityManager.finishModelDownload(
+                modelName: modelName,
+                success: true,
+                detailText: "Model ready."
+            )
+
+        case .failed(let message):
+            guard activeModel != .none else { return }
+            liveActivityManager.finishModelDownload(
+                modelName: modelName,
+                success: false,
+                detailText: message
+            )
+        }
     }
 }
 

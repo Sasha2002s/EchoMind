@@ -85,42 +85,44 @@ struct SettingsWhisperSection: View {
                     .padding(.vertical, 2)
                 }
 
-                HStack {
-                    if vm.whisperIsDownloading {
-                        Button(role: .destructive) {
-                            // Why: stopping a large model download by accident is expensive for users.
-                            showStopConfirmation = true
-                        } label: {
-                            Label("Stop", systemImage: "stop.circle")
-                        }
-                    } else {
-                        if vm.whisperPausedReason != nil && !isReady {
-                            Button {
-                                HapticsService.selectionChanged()
-                                vm.resumeWhisperDownload(for: whisperModel)
-                            } label: {
-                                Label("Resume", systemImage: "play.circle")
-                            }
-                        } else if !isReady {
-                            Button {
-                                HapticsService.impact(.medium)
-                                vm.startWhisperDownload(for: whisperModel)
-                            } label: {
-                                Label("Download", systemImage: "arrow.down")
-                            }
-                        }
+                if vm.whisperIsDownloading {
+                    Button {
+                        // Why: stopping a large model download by accident is expensive for users.
+                        showStopConfirmation = true
+                    } label: {
+                        Label("Stop Download", systemImage: "stop.circle.fill")
+                            .frame(maxWidth: .infinity)
                     }
-
-                    Spacer()
-
-                    if isReady && !vm.whisperIsDownloading {
-                        Button(role: .destructive) {
-                            HapticsService.notify(.warning)
-                            vm.deleteWhisperModel(for: whisperModel)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                } else if vm.whisperPausedReason != nil && !isReady {
+                    Button {
+                        HapticsService.selectionChanged()
+                        vm.resumeWhisperDownload(for: whisperModel)
+                    } label: {
+                        Label("Resume Download", systemImage: "play.fill")
+                            .frame(maxWidth: .infinity)
                     }
+                    .buttonStyle(.borderedProminent)
+                } else if !isReady {
+                    Button {
+                        HapticsService.impact(.medium)
+                        vm.startWhisperDownload(for: whisperModel)
+                    } label: {
+                        Label("Download Model", systemImage: "arrow.down.circle.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                } else {
+                    Button {
+                        HapticsService.notify(.warning)
+                        vm.deleteWhisperModel(for: whisperModel)
+                    } label: {
+                        Label("Delete Model", systemImage: "trash.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
                 }
 
                 Text("Whisper runs fully on device. Download once, then you can transcribe without internet.")

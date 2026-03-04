@@ -7,13 +7,43 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CB4A575C2F572DBB003D3ACE /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CB4A575B2F572DBB003D3ACE /* WidgetKit.framework */; };
+		CB4A575E2F572DBB003D3ACE /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CB4A575D2F572DBB003D3ACE /* SwiftUI.framework */; };
+		CB4A576F2F572DBC003D3ACE /* EchoMindLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CB4A57592F572DBB003D3ACE /* EchoMindLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		CBBCF76C2F52137F00F68AC4 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = CBBCF76B2F52137F00F68AC4 /* WhisperKit */; };
 		CBBCF76E2F52137F00F68AC4 /* whisperkit-cli in Frameworks */ = {isa = PBXBuildFile; productRef = CBBCF76D2F52137F00F68AC4 /* whisperkit-cli */; };
 		CBBCF7712F5217B400F68AC4 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = CBBCF7702F5217B400F68AC4 /* ZIPFoundation */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		CB4A576D2F572DBC003D3ACE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = CB0FDE142F502C8600F42130 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = CB4A57582F572DBB003D3ACE;
+			remoteInfo = EchoMindLiveActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CB4A57702F572DBC003D3ACE /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				CB4A576F2F572DBC003D3ACE /* EchoMindLiveActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		CB0FDE1C2F502C8600F42130 /* EchoMind.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = EchoMind.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CB4A57592F572DBB003D3ACE /* EchoMindLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = EchoMindLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		CB4A575B2F572DBB003D3ACE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		CB4A575D2F572DBB003D3ACE /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -24,6 +54,13 @@
 			);
 			target = CB0FDE1B2F502C8600F42130 /* EchoMind */;
 		};
+		CB4A57742F572DBC003D3ACE /* Exceptions for "EchoMindLiveActivity" folder in "EchoMindLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CB4A57582F572DBB003D3ACE /* EchoMindLiveActivityExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,6 +70,14 @@
 				CB39E7FC2F54A13400401622 /* Exceptions for "EchoMind" folder in "EchoMind" target */,
 			);
 			path = EchoMind;
+			sourceTree = "<group>";
+		};
+		CB4A575F2F572DBB003D3ACE /* EchoMindLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CB4A57742F572DBC003D3ACE /* Exceptions for "EchoMindLiveActivity" folder in "EchoMindLiveActivityExtension" target */,
+			);
+			path = EchoMindLiveActivity;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -48,6 +93,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CB4A57562F572DBB003D3ACE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CB4A575E2F572DBB003D3ACE /* SwiftUI.framework in Frameworks */,
+				CB4A575C2F572DBB003D3ACE /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -55,6 +109,8 @@
 			isa = PBXGroup;
 			children = (
 				CB0FDE1E2F502C8600F42130 /* EchoMind */,
+				CB4A575F2F572DBB003D3ACE /* EchoMindLiveActivity */,
+				CB4A575A2F572DBB003D3ACE /* Frameworks */,
 				CB0FDE1D2F502C8600F42130 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,8 +119,18 @@
 			isa = PBXGroup;
 			children = (
 				CB0FDE1C2F502C8600F42130 /* EchoMind.app */,
+				CB4A57592F572DBB003D3ACE /* EchoMindLiveActivityExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		CB4A575A2F572DBB003D3ACE /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				CB4A575B2F572DBB003D3ACE /* WidgetKit.framework */,
+				CB4A575D2F572DBB003D3ACE /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -77,10 +143,12 @@
 				CB0FDE182F502C8600F42130 /* Sources */,
 				CB0FDE192F502C8600F42130 /* Frameworks */,
 				CB0FDE1A2F502C8600F42130 /* Resources */,
+				CB4A57702F572DBC003D3ACE /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				CB4A576E2F572DBC003D3ACE /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				CB0FDE1E2F502C8600F42130 /* EchoMind */,
@@ -95,6 +163,28 @@
 			productReference = CB0FDE1C2F502C8600F42130 /* EchoMind.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CB4A57582F572DBB003D3ACE /* EchoMindLiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CB4A57732F572DBC003D3ACE /* Build configuration list for PBXNativeTarget "EchoMindLiveActivityExtension" */;
+			buildPhases = (
+				CB4A57552F572DBB003D3ACE /* Sources */,
+				CB4A57562F572DBB003D3ACE /* Frameworks */,
+				CB4A57572F572DBB003D3ACE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				CB4A575F2F572DBB003D3ACE /* EchoMindLiveActivity */,
+			);
+			name = EchoMindLiveActivityExtension;
+			packageProductDependencies = (
+			);
+			productName = EchoMindLiveActivityExtension;
+			productReference = CB4A57592F572DBB003D3ACE /* EchoMindLiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -106,6 +196,9 @@
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					CB0FDE1B2F502C8600F42130 = {
+						CreatedOnToolsVersion = 26.2;
+					};
+					CB4A57582F572DBB003D3ACE = {
 						CreatedOnToolsVersion = 26.2;
 					};
 				};
@@ -129,12 +222,20 @@
 			projectRoot = "";
 			targets = (
 				CB0FDE1B2F502C8600F42130 /* EchoMind */,
+				CB4A57582F572DBB003D3ACE /* EchoMindLiveActivityExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		CB0FDE1A2F502C8600F42130 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CB4A57572F572DBB003D3ACE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -151,7 +252,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CB4A57552F572DBB003D3ACE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CB4A576E2F572DBC003D3ACE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = CB4A57582F572DBB003D3ACE /* EchoMindLiveActivityExtension */;
+			targetProxy = CB4A576D2F572DBC003D3ACE /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		CB0FDE252F502C8700F42130 /* Debug */ = {
@@ -282,6 +398,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = EchoMind/EchoMind.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = CB67LVHN9G;
@@ -291,7 +408,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = EchoMind;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access to record your voice notes.";
+				INFOPLIST_KEY_NSSiriUsageDescription = "EchoMind has features that work with \"Hey Siri\".";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "EchoMind uses speech recognition to convert your voice recordings into text on your device.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -320,6 +439,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = EchoMind/EchoMind.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = CB67LVHN9G;
@@ -329,7 +449,9 @@
 				INFOPLIST_KEY_CFBundleDisplayName = EchoMind;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access to record your voice notes.";
+				INFOPLIST_KEY_NSSiriUsageDescription = "EchoMind has features that work with \"Hey Siri\".";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "EchoMind uses speech recognition to convert your voice recordings into text on your device.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -346,6 +468,68 @@
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		CB4A57712F572DBC003D3ACE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CB67LVHN9G;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EchoMindLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = EchoMindLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sashastepanov.EchoMind.EchoMindLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		CB4A57722F572DBC003D3ACE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CB67LVHN9G;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = EchoMindLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = EchoMindLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sashastepanov.EchoMind.EchoMindLiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
@@ -370,6 +554,15 @@
 			buildConfigurations = (
 				CB0FDE282F502C8700F42130 /* Debug */,
 				CB0FDE292F502C8700F42130 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CB4A57732F572DBC003D3ACE /* Build configuration list for PBXNativeTarget "EchoMindLiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CB4A57712F572DBC003D3ACE /* Debug */,
+				CB4A57722F572DBC003D3ACE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

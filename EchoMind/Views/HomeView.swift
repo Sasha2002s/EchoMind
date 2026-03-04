@@ -8,14 +8,18 @@
 import SwiftUI
 
 struct HomeView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     let recordingRepository: any RecordingRepository
     let player: LibraryAudioPlayer
 
     @State private var showingRecording = false
+    @State private var autoStartRecordingOnSheetOpen = false
     @State private var recent: [RecordingFile] = []
     @State private var lastSavedURL: URL?
     @State private var showSavedBanner = false
     @StateObject private var autoTranscriptionService = AutoTranscriptionService()
+    @StateObject private var recorderViewModel = AudioRecorderViewModel()
 
     var body: some View {
         NavigationStack {
@@ -33,11 +37,15 @@ struct HomeView: View {
                 .padding(.top, 12)
             }
             .task {
+                await consumeQueuedSiriRequestsIfNeeded()
                 await autoTranscriptionService.processQueuedTranscriptionsInForeground()
                 await reloadRecent()
             }
             .sheet(isPresented: $showingRecording) {
-                RecordingView { url in
+                RecordingView(
+                    viewModel: recorderViewModel,
+                    autoStartOnAppear: autoStartRecordingOnSheetOpen
+                ) { url in
                     lastSavedURL = url
                     Task { await reloadRecent() }
                     Task {
@@ -45,6 +53,29 @@ struct HomeView: View {
                         await reloadRecent()
                     }
                     showSavedBanner = true
+                }
+            }
+            .onChange(of: showingRecording) { _, isPresented in
+                if !isPresented {
+                    autoStartRecordingOnSheetOpen = false
+                }
+            }
+            .onChange(of: scenePhase) { _, newPhase in
+                guard newPhase == .active else { return }
+                Task {
+                    await consumeQueuedSiriRequestsIfNeeded()
+                    await reloadRecent()
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if recorderViewModel.hasActiveSession && !showingRecording {
+                    FloatingRecordingButton(durationText: recorderViewModel.formattedDuration) {
+                        HapticsService.selectionChanged()
+                        showingRecording = true
+                    }
+                    .padding(.trailing, 16)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
                 }
             }
             .overlay(alignment: .top) {
@@ -163,6 +194,36 @@ private extension HomeView {
         // Why: keep filesystem concerns in a repository so the view stays UI-only.
         recent = await recordingRepository.loadRecentRecordings(limit: 3)
     }
+
+    @MainActor
+    func consumeQueuedSiriRequestsIfNeeded() async {
+        if SiriLaunchRequestStore.consumeStopRecordingRequest(), recorderViewModel.hasActiveSession {
+            recorderViewModel.finishRecording()
+            if let savedURL = recorderViewModel.recordedURL {
+                lastSavedURL = savedURL
+                showSavedBanner = true
+                await autoTranscriptionService.transcribeIfNeeded(audioURL: savedURL)
+            }
+            // Why: once Siri stops recording, keep UI state aligned by dismissing recording controls.
+            showingRecording = false
+            autoStartRecordingOnSheetOpen = false
+        }
+
+        if SiriLaunchRequestStore.consumeStartRecordingRequest() {
+            // Why: if a recording already exists, reopen controls instead of starting a second session.
+            autoStartRecordingOnSheetOpen = !recorderViewModel.hasActiveSession
+            showingRecording = true
+        }
+
+        if SiriLaunchRequestStore.consumePlayLastRecordingRequest() {
+            // Why: avoid interrupting an active capture session when Siri requests playback.
+            guard !recorderViewModel.hasActiveSession else { return }
+            let latest = await recordingRepository.loadRecentRecordings(limit: 1).first
+            if let latest {
+                player.start(url: latest.url, id: latest.id)
+            }
+        }
+    }
 }
 
 // MARK: - Components
@@ -255,5 +316,30 @@ private struct SavedBannerView: View {
                 .fill(.ultraThinMaterial)
         )
         .padding(.horizontal)
+    }
+}
+
+private struct FloatingRecordingButton: View {
+    let durationText: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "mic.fill")
+                Text(durationText)
+                    .monospacedDigit()
+                    .font(.subheadline.weight(.semibold))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(.ultraThinMaterial)
+            )
+        }
+        // Why: keep one-tap access to recording controls after the user hides the sheet.
+        .accessibilityLabel("Open active recording")
+        .buttonStyle(.plain)
     }
 }

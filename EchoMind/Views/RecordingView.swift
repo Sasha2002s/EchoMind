@@ -15,13 +15,21 @@ struct RecordingView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("settings.shareStyle") private var shareStyle: ShareStylePreference = .audioOnly
 
+    let autoStartOnAppear: Bool
     let onFinished: (URL) -> Void
-    @StateObject private var vm = AudioRecorderViewModel()
+    @ObservedObject private var vm: AudioRecorderViewModel
     @State private var shareItems: [Any] = []
     @State private var isShareSheetPresented = false
+    @State private var didAutoStartOnAppear = false
     private let shareService = RecordingShareService()
 
-    init(onFinished: @escaping (URL) -> Void = { _ in }) {
+    init(
+        viewModel: AudioRecorderViewModel,
+        autoStartOnAppear: Bool = false,
+        onFinished: @escaping (URL) -> Void = { _ in }
+    ) {
+        self._vm = ObservedObject(wrappedValue: viewModel)
+        self.autoStartOnAppear = autoStartOnAppear
         self.onFinished = onFinished
     }
 
@@ -115,8 +123,17 @@ struct RecordingView: View {
             }
         }
         .padding(.top)
-        .onAppear { vm.onAppear() }
-        .onDisappear { vm.onDisappear() }
+        .onAppear {
+            vm.onAppear()
+            guard autoStartOnAppear, !didAutoStartOnAppear, !vm.hasActiveSession else { return }
+            didAutoStartOnAppear = true
+            // Why: Siri "Record with EchoMind" should begin capture without an extra tap.
+            vm.startRecording()
+        }
+        .onDisappear {
+            vm.onDisappear()
+            didAutoStartOnAppear = false
+        }
         .onChange(of: vm.showMicAlert) { _, isShown in
             if isShown {
                 HapticsService.notify(.error)
@@ -131,6 +148,16 @@ struct RecordingView: View {
             shareItems = []
         }) {
             ActivityView(items: shareItems)
+        }
+        .toolbar {
+            if vm.hasActiveSession {
+                ToolbarItem(placement: .topBarTrailing) {
+                    // Why: gives an explicit way to temporarily hide controls without stopping capture.
+                    Button("Hide") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 
@@ -148,7 +175,7 @@ struct RecordingView: View {
 }
 
 #Preview {
-    RecordingView(onFinished: { _ in })
+    RecordingView(viewModel: AudioRecorderViewModel(), onFinished: { _ in })
 }
 
 

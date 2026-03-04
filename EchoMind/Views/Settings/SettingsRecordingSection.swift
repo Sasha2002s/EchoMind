@@ -13,6 +13,8 @@ struct SettingsRecordingSection: View {
     @Binding var defaultTranscriptionModel: TranscriptionEngine
     @Binding var transcriptionLanguage: TranscriptionLanguage
     @Binding var preventAutoLock: Bool
+    @Binding var includeDevicePlaybackAudio: Bool
+    @Binding var liveActivitiesEnabled: Bool
 
     var body: some View {
         Section("Recording") {
@@ -21,6 +23,20 @@ struct SettingsRecordingSection: View {
                 subtitle: "Keep screen awake while recording",
                 systemImage: "lock.open",
                 isOn: $preventAutoLock
+            )
+
+            ToggleRow(
+                title: "Include Device Playback Audio",
+                subtitle: "Keep media playing while recording (captured acoustically via microphone)",
+                systemImage: "speaker.wave.2",
+                isOn: $includeDevicePlaybackAudio
+            )
+
+            ToggleRow(
+                title: "Live Activities",
+                subtitle: "Show recording/download status on Lock Screen and Dynamic Island",
+                systemImage: "dot.radiowaves.left.and.right",
+                isOn: $liveActivitiesEnabled
             )
 
             Button {

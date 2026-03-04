@@ -22,6 +22,8 @@ struct SettingsView: View {
     @AppStorage("settings.defaultExportFormat") private var defaultExportFormat: ExportFormatPreference = .m4a
     @AppStorage("settings.shareStyle") private var shareStyle: ShareStylePreference = .audioOnly
     @AppStorage("settings.preventAutoLock") private var preventAutoLock: Bool = true
+    @AppStorage("settings.includeDevicePlaybackAudio") private var includeDevicePlaybackAudio: Bool = false
+    @AppStorage(EchoMindLiveActivityManager.liveActivitiesEnabledSettingKey) private var liveActivitiesEnabled: Bool = true
     @AppStorage("settings.whisperModel") private var whisperModel: WhisperModelChoice = .none
     @AppStorage(WhisperBackgroundDownloadManager.wifiOnlySettingKey) private var whisperDownloadWiFiOnly = true
     @AppStorage(WhisperBackgroundDownloadManager.pauseOnLowPowerSettingKey) private var whisperPauseOnLowPower = true
@@ -45,7 +47,9 @@ struct SettingsView: View {
                 SettingsRecordingSection(
                     defaultTranscriptionModel: $defaultTranscriptionModel,
                     transcriptionLanguage: $transcriptionLanguage,
-                    preventAutoLock: $preventAutoLock
+                    preventAutoLock: $preventAutoLock,
+                    includeDevicePlaybackAudio: $includeDevicePlaybackAudio,
+                    liveActivitiesEnabled: $liveActivitiesEnabled
                 )
 
                 SettingsAISection(
@@ -53,6 +57,8 @@ struct SettingsView: View {
                     summaryStyle: $summaryStyle,
                     taskDetectionEnabled: $taskDetectionEnabled
                 )
+
+                SettingsSiriSection()
 
                 SettingsWhisperSection(
                     whisperModel: $whisperModel,
@@ -73,9 +79,13 @@ struct SettingsView: View {
             }
             .onAppear {
                 vm.refreshWhisperModelInstalledState(for: whisperModel)
+                EchoMindLiveActivityManager.shared.setLiveActivitiesEnabled(liveActivitiesEnabled)
             }
             .onChange(of: whisperModel) { _, newValue in
                 vm.refreshWhisperModelInstalledState(for: newValue)
+            }
+            .onChange(of: liveActivitiesEnabled) { _, isEnabled in
+                EchoMindLiveActivityManager.shared.setLiveActivitiesEnabled(isEnabled)
             }
             .navigationTitle("Settings")
         }

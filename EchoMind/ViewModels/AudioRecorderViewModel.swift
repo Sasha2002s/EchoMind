@@ -14,6 +14,8 @@ import AVFoundation
 
 @MainActor
 final class AudioRecorderViewModel: ObservableObject {
+    private static let includeDevicePlaybackAudioSettingKey = "settings.includeDevicePlaybackAudio"
+
     @Published var isRecording: Bool = false
     @Published var isPaused: Bool = false
     @Published var duration: TimeInterval = 0
@@ -21,11 +23,28 @@ final class AudioRecorderViewModel: ObservableObject {
     @Published var waveformLevels: [CGFloat] = Array(repeating: 0.1, count: 24)
     @Published var showMicAlert: Bool = false
 
+    private let defaults: UserDefaults
     private var recorder: AVAudioRecorder?
     private var durationTask: Task<Void, Never>?
     private var levelTask: Task<Void, Never>?
+    private let liveActivityManager = EchoMindLiveActivityManager.shared
+    private var lastPublishedElapsedSeconds: Int = -1
+    private var interruptionObserver: NSObjectProtocol?
+    private var wasInterruptedDuringRecording = false
+    private var isStartingRecording = false
 
     private(set) var recordedURL: URL?
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        registerAudioSessionInterruptionObserver()
+    }
+
+    deinit {
+        if let interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+        }
+    }
 
     var hasActiveSession: Bool {
         recordedURL != nil && (isRecording || isPaused)
@@ -39,23 +58,47 @@ final class AudioRecorderViewModel: ObservableObject {
     }
 
     var primaryActionDisabled: Bool {
+        // Why: block repeat taps while async recording setup is still in-flight.
+        if isStartingRecording { return true }
         // Don’t allow finishing immediately by accident.
-        (isRecording || isPaused) && duration < 0.4
+        return (isRecording || isPaused) && duration < 0.4
     }
 
     func onAppear() {
+        if hasActiveSession {
+            // Why: allow reopening the recording UI without interrupting an in-progress capture.
+            syncDurationFromRecorder()
+            if isRecording {
+                startTimers()
+                statusText = "Recording…"
+            } else {
+                stopTimers()
+                statusText = "Paused."
+            }
+            return
+        }
+        // Why: avoid showing stale bars from a previous session when opening the recorder idle.
+        resetWaveformLevels()
         statusText = "Tap Start and speak clearly."
     }
 
     func onDisappear() {
-        stopTimers()
-        recorder?.stop()
-        recorder = nil
-        isPaused = false
+        if hasActiveSession {
+            // Why: keep duration updates visible in the floating control while hidden.
+            stopMeteringUpdates()
+            return
+        }
+        tearDownRecorderResources()
     }
 
     func startRecording() {
-        Task {
+        // Why: Siri/tap retries can arrive before state flips to recording; prevent parallel recorder setup.
+        guard !isStartingRecording, !hasActiveSession else { return }
+        isStartingRecording = true
+
+        Task { @MainActor in
+            defer { isStartingRecording = false }
+
             let ok = await requestMicPermissionIfNeeded()
             guard ok else {
                 showMicAlert = true
@@ -82,12 +125,15 @@ final class AudioRecorderViewModel: ObservableObject {
                 recorder = newRecorder
                 recordedURL = url
 
+                // Why: ensure each new session starts with a clean waveform baseline.
+                resetWaveformLevels()
                 isRecording = true
                 isPaused = false
                 duration = 0
                 statusText = "Recording…"
 
                 startTimers()
+                publishRecordingLiveActivity(force: true)
             } catch {
                 statusText = "Failed to start recording: \(error.localizedDescription)"
                 isRecording = false
@@ -97,22 +143,34 @@ final class AudioRecorderViewModel: ObservableObject {
 
     func finishRecording() {
         guard hasActiveSession else { return }
+        syncDurationFromRecorder()
+        let elapsedSeconds = max(0, Int(duration.rounded(.down)))
         recorder?.stop()
         stopTimers()
         isRecording = false
         isPaused = false
         statusText = "Saved recording."
+        // Why: hide live waveform once capture is finished to prevent "still recording" confusion.
+        resetWaveformLevels()
+        lastPublishedElapsedSeconds = -1
+        liveActivityManager.endRecording(elapsedSeconds: elapsedSeconds)
 
         // Optional: release session so other audio can resume.
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     func cancelRecording() {
+        syncDurationFromRecorder()
+        let elapsedSeconds = max(0, Int(duration.rounded(.down)))
         recorder?.stop()
         stopTimers()
         isRecording = false
         isPaused = false
         statusText = "Cancelled."
+        // Why: clear any last metering bars when user discards a take.
+        resetWaveformLevels()
+        lastPublishedElapsedSeconds = -1
+        liveActivityManager.endRecording(elapsedSeconds: elapsedSeconds)
 
         if let url = recordedURL {
             try? FileManager.default.removeItem(at: url)
@@ -129,6 +187,7 @@ final class AudioRecorderViewModel: ObservableObject {
         isRecording = false
         isPaused = true
         statusText = "Paused."
+        publishRecordingLiveActivity(force: true)
     }
 
     func resumeRecording() {
@@ -138,6 +197,7 @@ final class AudioRecorderViewModel: ObservableObject {
         isPaused = false
         statusText = "Recording…"
         startTimers()
+        publishRecordingLiveActivity(force: true)
     }
 
     // MARK: - Permissions
@@ -163,7 +223,18 @@ final class AudioRecorderViewModel: ObservableObject {
 
     private func configureAudioSession() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        var options: AVAudioSession.CategoryOptions = [.defaultToSpeaker, .allowBluetoothHFP]
+        let mode: AVAudioSession.Mode
+
+        if includeDevicePlaybackAudio {
+            // Why: allow other media playback to continue while we still capture microphone input.
+            options.insert(.mixWithOthers)
+            mode = .default
+        } else {
+            mode = .spokenAudio
+        }
+
+        try session.setCategory(.playAndRecord, mode: mode, options: options)
         try session.setActive(true)
     }
 
@@ -175,7 +246,7 @@ final class AudioRecorderViewModel: ObservableObject {
         durationTask = Task { @MainActor in
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-                self.duration += 0.1
+                self.syncDurationFromRecorder()
             }
         }
 
@@ -190,8 +261,105 @@ final class AudioRecorderViewModel: ObservableObject {
     private func stopTimers() {
         durationTask?.cancel()
         durationTask = nil
+        stopMeteringUpdates()
+    }
+
+    private func stopMeteringUpdates() {
         levelTask?.cancel()
         levelTask = nil
+    }
+
+    private func tearDownRecorderResources() {
+        stopTimers()
+        recorder?.stop()
+        recorder = nil
+        isPaused = false
+        isRecording = false
+    }
+
+    private func syncDurationFromRecorder() {
+        guard let recorder else { return }
+        duration = recorder.currentTime
+        publishRecordingLiveActivity()
+    }
+
+    private func publishRecordingLiveActivity(force: Bool = false) {
+        guard hasActiveSession else { return }
+
+        let elapsedSeconds = max(0, Int(duration.rounded(.down)))
+        guard force || elapsedSeconds != lastPublishedElapsedSeconds else { return }
+
+        lastPublishedElapsedSeconds = elapsedSeconds
+        liveActivityManager.upsertRecording(
+            isPaused: isPaused,
+            elapsedSeconds: elapsedSeconds
+        )
+    }
+
+    private var includeDevicePlaybackAudio: Bool {
+        defaults.object(forKey: Self.includeDevicePlaybackAudioSettingKey) as? Bool ?? false
+    }
+
+    private func registerAudioSessionInterruptionObserver() {
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor in
+                self?.handleAudioSessionInterruption(notification)
+            }
+        }
+    }
+
+    private func handleAudioSessionInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeRawValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let interruptionType = AVAudioSession.InterruptionType(rawValue: typeRawValue) else {
+            return
+        }
+
+        switch interruptionType {
+        case .began:
+            wasInterruptedDuringRecording = isRecording
+            guard isRecording else { return }
+
+            recorder?.pause()
+            stopTimers()
+            isRecording = false
+            isPaused = true
+            statusText = "Paused by another audio source."
+            publishRecordingLiveActivity(force: true)
+
+        case .ended:
+            defer { wasInterruptedDuringRecording = false }
+            guard wasInterruptedDuringRecording, hasActiveSession else { return }
+
+            let optionsRawValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
+            let options = AVAudioSession.InterruptionOptions(rawValue: optionsRawValue)
+
+            guard options.contains(.shouldResume) else {
+                statusText = "Paused."
+                publishRecordingLiveActivity(force: true)
+                return
+            }
+
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+                recorder?.record()
+                isRecording = true
+                isPaused = false
+                statusText = "Recording…"
+                startTimers()
+                publishRecordingLiveActivity(force: true)
+            } catch {
+                statusText = "Could not resume after interruption."
+                publishRecordingLiveActivity(force: true)
+            }
+
+        @unknown default:
+            break
+        }
     }
 
     private func tickLevel() {
@@ -216,6 +384,10 @@ final class AudioRecorderViewModel: ObservableObject {
         // Add a gentle curve so quiet speech still shows.
         let curved = pow(value, 0.5)
         return CGFloat(curved)
+    }
+
+    private func resetWaveformLevels() {
+        waveformLevels = Array(repeating: 0.1, count: 24)
     }
 
     // MARK: - File URL

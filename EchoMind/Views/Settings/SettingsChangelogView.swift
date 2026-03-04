@@ -13,6 +13,11 @@ struct ChangelogView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("March 4, 2026") {
+                    Label("Hardened recording start flow to prevent rapid-tap/Siri race conditions", systemImage: "lock.shield")
+                    Label("Refined Local Whisper action buttons and fixed stretched Delete button rendering", systemImage: "trash.slash")
+                }
+
                 Section("March 1, 2026 (Today)") {
                     Label("Added dependency container and root-level injection", systemImage: "shippingbox")
                     Label("Unified recordings access with one repository", systemImage: "externaldrive.connected.to.line.below")
